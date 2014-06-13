@@ -191,9 +191,9 @@ def visit_cond_expr(ast, ctx):
     struct = merge(merge(if_struct, test_struct), else_struct)
     rtype = merge_rtypes(if_rtype, else_rtype)
 
-    if isinstance(ast.test, nodes.Test) and isinstance(ast.test.node, nodes.Name):
-        if ast.test.name in ('defined', 'undefined'):
-            rtype.may_be_defined = True
+    if (isinstance(ast.test, nodes.Test) and isinstance(ast.test.node, nodes.Name) and
+        ast.test.name in ('defined', 'undefined')):
+        struct[ast.test.node.name].may_be_defined = True
     return rtype, struct
 
 
