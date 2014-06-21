@@ -1,6 +1,8 @@
 from jinja2 import nodes
-from jinja2schema.core import (parse, infer, Context, visit_assign, visit_if, visit_for)
+from jinja2schema.core import (parse, infer, Context, MergeException, visit_assign, visit_if, visit_for)
 from jinja2schema.model import Dictionary, Scalar, List, Unknown, Tuple
+import pytest
+
 from .util import assert_structures_equal
 
 
@@ -127,6 +129,18 @@ def test_assign_5():
         ], constant=True), constant=True)
     })
     assert_structures_equal(struct, expected_struct, check_linenos=False)
+
+
+def test_assign_6():
+    template = '''
+    {%- set weights = [
+        ('A', {'data': 0.3}),
+        ('B', {'data': 0.9}, 1, 2),
+    ] %}
+    '''
+    ast = parse(template).find(nodes.Assign)
+    with pytest.raises(MergeException):
+        print visit_assign(ast, Context())
 
 
 def test_if_1():

@@ -69,16 +69,15 @@ def merge(fst, snd):
     result.linenos = list(sorted(set(fst.linenos + snd.linenos)))
     result.constant = fst.constant
     result.may_be_defined = fst.may_be_defined
+    result.used_with_default = fst.used_with_default and snd.used_with_default
     return result
 
 
 def merge_rtypes(fst, snd, operator=None):
-    # TODO
-    if isinstance(fst, Scalar) and not isinstance(snd, Scalar):
-        return snd
-    elif isinstance(snd, Scalar) and not isinstance(fst, Scalar):
-        return fst
-    return fst
+    if operator == '+':
+        if type(fst) is not type(snd):
+            raise MergeException(fst, snd)
+    return merge(fst, snd)
 
 
 stmt_visitors = {}
@@ -197,6 +196,72 @@ def visit_cond_expr(ast, ctx):
     return rtype, struct
 
 
+@visits_expr(nodes.Filter)
+def visit_filter(ast, ctx):
+    rtype = ctx.rtype_cls
+
+    if ast.name in ('abs', 'striptags', 'capitalize', 'center', 'escape', 'filesizeformat',
+                    'float', 'forceescape', 'format', 'indent', 'int', 'replace', 'round',
+                    'safe', 'string', 'striptags', 'title', 'trim', 'truncate', 'upper',
+                    'urlencode', 'urlize', 'wordcount', 'wordwrap'):
+        rtype = Scalar
+        inner_struct = Scalar()
+    elif ast.name in ('batch', 'slice'):
+        inner_struct = merge(
+            List(List(Unknown())),
+            ctx.get_current_inner_struct(ast)
+        ).el_struct
+    elif ast.name == 'default':
+        default_value_rtype, default_value_struct = visit_expr(ast.args[0], Context(rtype_cls=Unknown))
+        inner_struct = merge(
+            ctx.get_current_inner_struct(ast),
+            default_value_rtype,
+        )
+        inner_struct.used_with_default = True
+    elif ast.name == 'dictsort':
+        rtype = lambda *a, **kw: List(Tuple([Scalar(), Unknown()]))
+        key_struct = Scalar()  # keys may only be scalars
+        value_struct = Unknown()  # anything
+        merge(  # merge just to validate
+            ctx.get_current_inner_struct(ast),
+            List(Tuple([key_struct, value_struct])),
+        )
+        inner_struct = Dictionary()
+    elif ast.name in ('first', 'join', 'last', 'length', 'random', 'sum'):
+        if ast.name in ('first', 'last', 'random'):
+            el_struct = ctx.get_current_inner_struct(ast)
+        elif ast.name == 'length':
+            el_struct = Unknown()
+            rtype = Scalar
+        else:
+            el_struct = Scalar()
+            rtype = Scalar
+        inner_struct = List(el_struct)
+    elif ast.name in ('groupby', 'map', 'reject', 'rejectattr', 'select', 'selectattr', 'sort'):
+        inner_struct = merge(
+            List(Unknown()),
+            ctx.get_current_inner_struct(ast)
+        )
+    elif ast.name == 'list':
+        rtype = lambda *a, **kw: List(Scalar())
+        inner_struct = merge(
+            List(Unknown()),
+            ctx.get_current_inner_struct(ast)
+        ).el_struct
+    elif ast.name == 'pprint':
+        rtype = Scalar
+        inner_struct = ctx.get_current_inner_struct(ast)
+    elif ast.name == 'xmlattr':
+        rtype = Scalar
+        inner_struct = Dictionary()
+    elif ast.name == 'attr':
+        raise UnsupportedSyntax(ast, 'attr filter is not supported')
+    else:
+        raise UnsupportedSyntax(ast, 'unknown filter')
+
+    return visit_expr(ast.node, Context(rtype_cls=rtype, inner_struct=inner_struct))
+
+
 # :class:`nodes.Literal` visitors
 
 @visits_expr(nodes.TemplateData)
@@ -206,7 +271,8 @@ def visit_template_data(ast, ctx):
 
 @visits_expr(nodes.Const)
 def visit_const(ast, ctx):
-    return Scalar(linenos=[ast.lineno], constant=True), Dictionary()
+    rtype = Scalar(linenos=[ast.lineno], constant=True)
+    return rtype, Dictionary()
 
 
 @visits_expr(nodes.Tuple)
@@ -219,7 +285,8 @@ def visit_tuple(ast, ctx):
         rtypes.append(item_rtype)
         struct = merge(struct, item_struct)
 
-    return Tuple(rtypes, linenos=[ast.lineno], constant=True), struct
+    rtype = Tuple(rtypes, linenos=[ast.lineno], constant=True)
+    return rtype, struct
 
 
 @visits_expr(nodes.List)
@@ -234,7 +301,7 @@ def visit_list(ast, ctx):
             el_rtype = item_rtype
         else:
             el_rtype = merge_rtypes(el_rtype, item_rtype)
-    rtype = List(el_rtype, linenos=[ast.lineno], constant=True)
+    rtype = List(el_rtype or Unknown(), linenos=[ast.lineno], constant=True)
     return rtype, struct
 
 
@@ -259,17 +326,25 @@ def visit_dict(ast, ctx):
 def visit_for(ast, ctx):
     body_struct = visit_nodes_and_merge(ast.body, ctx)
     else_struct = visit_nodes_and_merge(ast.else_, ctx)
+
     if 'loop' in body_struct:
         # exclude a special `loop` variable from the body structure
         del body_struct['loop']
+
     if isinstance(ast.target, nodes.Tuple):
         target_struct = Tuple([body_struct.pop(item.name, Unknown(linenos=[ast.target.lineno]))
                                for item in ast.target.items],
                               linenos=[ast.target.lineno])
     else:
         target_struct = body_struct.pop(ast.target.name, Unknown(linenos=[ast.target.lineno]))
-    context = Context(rtype_cls=Unknown, inner_struct=List(target_struct, linenos=[ast.lineno]))
-    return merge(merge(visit(ast.iter, context), body_struct), else_struct)
+
+    iter_rtype, iter_struct = visit_expr(
+        ast.iter,
+        Context(
+            rtype_cls=Unknown,
+            inner_struct=List(target_struct, linenos=[ast.lineno])))
+
+    return merge(merge(iter_struct, body_struct), else_struct)
 
 
 @visits_stmt(nodes.If)
@@ -298,7 +373,7 @@ def visit_assign(ast, ctx):
             (isinstance(ast.target, nodes.Tuple) and isinstance(ast.node, nodes.Tuple))):
         context = Context(rtype_cls=Unknown)
         variables = []
-        if isinstance(ast.target, nodes.Name):
+        if not (isinstance(ast.target, nodes.Tuple) and isinstance(ast.node, nodes.Tuple)):
             variables.append((ast.target.name, ast.node))
         else:
             if len(ast.target.items) != len(ast.node.items):

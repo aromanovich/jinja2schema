@@ -17,10 +17,11 @@ class Variable(object):
         self.linenos = kwargs.pop('linenos', [])
         self.constant = kwargs.pop('constant', False)
         self.may_be_defined = kwargs.pop('may_be_defined', False)
+        self.used_with_default = kwargs.pop('used_with_default', False)
 
     @property
     def required(self):
-        return not self.may_be_defined
+        return not self.may_be_defined and not self.used_with_default
 
     def __eq__(self, other):
         return type(self) is type(other)

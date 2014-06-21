@@ -1,7 +1,9 @@
+import pytest
 from jinja2 import nodes
-from jinja2schema.core import (parse, Context, visit_getitem, visit_cond_expr,
-                               visit_getattr, visit_compare)
-from jinja2schema.model import Dictionary, Scalar, List
+from jinja2schema.core import (parse, Context, MergeException, UnsupportedSyntax,
+                               visit_getitem, visit_cond_expr,
+                               visit_getattr, visit_compare, visit_filter)
+from jinja2schema.model import Dictionary, Scalar, List, Unknown
 from .util import assert_structures_equal, assert_rtypes_equal
 
 
@@ -132,3 +134,66 @@ def test_compare_2():
 
     expected_rtype = Scalar()
     assert_rtypes_equal(rtype, expected_rtype)
+
+
+def test_filter_1():
+    template = '{{ x|striptags }}'
+    filter_ast = parse(template).find(nodes.Filter)
+    rtype, struct = visit_filter(filter_ast, Context())
+
+    expected_struct = Dictionary({'x': Scalar()})
+    assert_structures_equal(struct, expected_struct)
+
+
+def test_filter_2():
+    with pytest.raises(MergeException):
+        template = '''{{ items|batch(3, '&nbsp;') }}'''
+        filter_ast = parse(template).find(nodes.Filter)
+        visit_filter(filter_ast, Context())
+
+
+def test_filter_3():
+    template = '''{{ x|default('g') }}'''
+    filter_ast = parse(template).find(nodes.Filter)
+    rtype, struct = visit_filter(filter_ast, Context())
+
+    expected_struct = Dictionary({'x': Scalar(used_with_default=True)})
+    assert_structures_equal(struct, expected_struct, check_linenos=False)
+
+
+def test_filter_4():
+    template = '''{{ (xs|first|last).gsom|sort|length }}'''
+    filter_ast = parse(template).find(nodes.Filter)
+    rtype, struct = visit_filter(filter_ast, Context())
+
+    expected_struct = Dictionary({
+        'xs': List(List(Dictionary({
+            'gsom': List(Unknown(linenos=[1])),
+        }))),
+    })
+    assert_structures_equal(struct, expected_struct, check_linenos=False)
+
+
+def test_filter_5():
+    template = '''{{ x|list|sort|first }}'''
+    filter_ast = parse(template).find(nodes.Filter)
+    rtype, struct = visit_filter(filter_ast, Context())
+
+    expected_struct = Dictionary({
+        'x': Scalar(),
+    })
+    assert_structures_equal(struct, expected_struct, check_linenos=False)
+
+
+def test_filter_6():
+    template = '''{{ x|unknownfilter }}'''
+    filter_ast = parse(template).find(nodes.Filter)
+    with pytest.raises(UnsupportedSyntax):
+        visit_filter(filter_ast, Context())
+
+
+def test_filter_7():
+    template = '''{{ x|first|list }}'''
+    filter_ast = parse(template).find(nodes.Filter)
+    with pytest.raises(MergeException):
+        visit_filter(filter_ast, Context())

@@ -1,7 +1,7 @@
 import pytest
 
 from jinja2schema.core import infer, parse, MergeException
-from jinja2schema.model import Dictionary, Scalar, Unknown
+from jinja2schema.model import List, Dictionary, Scalar, Unknown
 from .util import assert_structures_equal
 
 
@@ -156,3 +156,134 @@ def test_basics_4():
         'timestamp': Unknown(constant=False, linenos=[7])
     })
     assert_structures_equal(struct, expected_struct)
+
+
+def test_basics_5():
+    template = '''
+    {% for row in items|batch(3, '&nbsp;') %}
+        {% for column in row %}
+            {{ column.x }}
+        {% endfor %}
+    {% endfor %}
+    '''
+    struct = infer(parse(template))
+    expected_struct = Dictionary({
+        'items': List(Dictionary({
+            'x': Scalar(linenos=[4])
+        }, linenos=[4])),
+    })
+    assert_structures_equal(struct, expected_struct, check_linenos=False)
+
+
+def test_basics_6():
+    template = '''
+    {% for row in items|batch(3, '&nbsp;') %}
+    {% endfor %}
+    '''
+    struct = infer(parse(template))
+    expected_struct = Dictionary({
+        'items': List(Unknown()),
+    })
+    assert_structures_equal(struct, expected_struct, check_linenos=False)
+
+
+def test_basics_7():
+    template = '''
+    {% for row in items|batch(3, '&nbsp;')|batch(1) %}
+        {{ row[1][1].name }}
+    {% endfor %}
+    '''
+    struct = infer(parse(template))
+    expected_struct = Dictionary({
+        'items': List(Dictionary({
+            'name': Scalar(),
+        })),
+    })
+    assert_structures_equal(struct, expected_struct, check_linenos=False)
+
+
+
+def test_basics_8():
+    template = '''
+    {% for row in items|batch(3, '&nbsp;')|batch(1) %}
+        {{ row[1].name }}
+    {% endfor %}
+    '''
+    with pytest.raises(MergeException):
+        infer(parse(template))
+
+
+def test_basics_9():
+    template = '''
+    {% set xs = items|batch(3, '&nbsp;') %}
+    {{ xs[0][0] }}
+    '''
+    struct = infer(parse(template))
+    expected_struct = Dictionary({
+        'items': List(Unknown()),  # TODO it should be Scalar
+    })
+    assert_structures_equal(struct, expected_struct, check_linenos=False)
+
+
+def test_basics_10():
+    template = '''
+    {% set items = data|dictsort %}
+    {% for x, y in items %}
+    {% endfor %}
+    '''
+    struct = infer(parse(template))
+    expected_struct = Dictionary({
+        'data': Dictionary({
+        }),
+    })
+    assert_structures_equal(struct, expected_struct, check_linenos=False)
+
+
+def test_basics_11():
+    template = '''
+    {{ a|xmlattr }}
+    {{ a.attr1|join(',') }}
+    {{ a.attr2|default([])|first }}
+    {{ a.attr3|default('gsom') }}
+    {% for x in xs|rejectattr('is_active') %}
+        {{ x }}
+    {% endfor %}
+    '''
+    struct = infer(parse(template))
+    expected_struct = Dictionary({
+        'a': Dictionary({
+            'attr1': List(Scalar()),
+            'attr2': List(Scalar(), used_with_default=True),
+            'attr3': Scalar(used_with_default=True)
+        }),
+        'xs': List(
+            Scalar()  # TODO it should be Dictionary({'is_active': Unknown()})
+        ),
+    })
+    assert_structures_equal(struct, expected_struct, check_linenos=False)
+
+
+def test_basics_12():
+    template = '''
+    {% for k, v in data|dictsort %}
+        {{ k }}
+        {{ v }}
+    {% endfor %}
+    '''
+    struct = infer(parse(template))
+    expected_struct = Dictionary({
+        'data': Dictionary({
+        }),
+    })
+    assert_structures_equal(struct, expected_struct, check_linenos=False)
+
+
+def test_basics_13():  # test dictsort
+    template = '''
+    {% for k, v in data|dictsort %}
+        {{ k.x }}
+        {{ v }}
+    {% endfor %}
+    '''
+    with pytest.raises(MergeException):
+        infer(parse(template))

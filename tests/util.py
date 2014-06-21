@@ -8,6 +8,7 @@ def assert_rtypes_equal(a, b):
 def assert_structures_equal(a, b, check_required=True, check_linenos=True):
     assert type(a) is type(b)
     assert a.constant == b.constant
+    assert a.used_with_default == b.used_with_default
     assert not check_required or a.required == b.required
     assert not check_linenos or a.linenos == b.linenos
 
