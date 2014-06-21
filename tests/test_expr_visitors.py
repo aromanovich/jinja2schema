@@ -1,7 +1,7 @@
 import pytest
 from jinja2 import nodes
 from jinja2schema.core import (parse, Context, MergeException, UnsupportedSyntax,
-                               visit_getitem, visit_cond_expr,
+                               visit_getitem, visit_cond_expr, visit_test,
                                visit_getattr, visit_compare, visit_filter)
 from jinja2schema.model import Dictionary, Scalar, List, Unknown
 from .util import assert_structures_equal, assert_rtypes_equal
@@ -197,3 +197,36 @@ def test_filter_7():
     filter_ast = parse(template).find(nodes.Filter)
     with pytest.raises(MergeException):
         visit_filter(filter_ast, Context())
+
+
+def test_test_1():
+    template = '''{{ x is divisibleby data.field }}'''
+    test_ast = parse(template).find(nodes.Test)
+    rtype, struct = visit_test(test_ast, Context())
+
+    expected_struct = Dictionary({
+        'x': Scalar(),
+        'data': Dictionary({
+            'field': Scalar(),
+        })
+    })
+    assert_structures_equal(struct, expected_struct, check_linenos=False)
+
+    template = '''{{ x is divisibleby 3 }}'''
+    test_ast = parse(template).find(nodes.Test)
+    rtype, struct = visit_test(test_ast, Context())
+
+    expected_struct = Dictionary({
+        'x': Scalar(),
+    })
+    assert_structures_equal(struct, expected_struct, check_linenos=False)
+
+def test_test_2():
+    template = '''{{ x is string }}'''
+    test_ast = parse(template).find(nodes.Test)
+    rtype, struct = visit_test(test_ast, Context())
+
+    expected_struct = Dictionary({
+        'x': Unknown()
+    })
+    assert_structures_equal(struct, expected_struct, check_linenos=False)

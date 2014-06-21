@@ -166,8 +166,20 @@ def visit_getattr(ast, ctx):
 
 @visits_expr(nodes.Test)
 def visit_test(ast, ctx):
-    # todo type assertion
-    return visit_expr(ast.node, ctx)
+    if ast.name in ('divisibleby', 'escaped', 'even', 'lower', 'odd', 'upper'):
+        inner_struct = Scalar(linenos=[ast.lineno])
+    elif ast.name in ('defined', 'undefined', 'equalto', 'iterable', 'mapping',
+                      'none', 'number', 'sameas', 'sequence', 'string'):
+        inner_struct = Unknown(linenos=[ast.lineno])
+    else:
+        raise UnsupportedSyntax(ast, 'unknown test "{}"'.format(ast.name))
+    rtype, struct = visit_expr(ast.node, Context(rtype_cls=ctx.rtype_cls, inner_struct=inner_struct))
+    if ast.name == 'divisibleby':
+        if not ast.args:
+            raise UnsupportedSyntax(ast, 'divisibleby must have an argument')
+        arg_rtype, arg_struct = visit_expr(ast.args[0], Context(rtype_cls=Scalar))
+        struct = merge(arg_struct, struct)
+    return rtype, struct
 
 
 @visits_expr(nodes.Name)
@@ -203,7 +215,7 @@ def visit_filter(ast, ctx):
     if ast.name in ('abs', 'striptags', 'capitalize', 'center', 'escape', 'filesizeformat',
                     'float', 'forceescape', 'format', 'indent', 'int', 'replace', 'round',
                     'safe', 'string', 'striptags', 'title', 'trim', 'truncate', 'upper',
-                    'urlencode', 'urlize', 'wordcount', 'wordwrap'):
+                    'urlencode', 'urlize', 'wordcount', 'wordwrap', 'e'):
         rtype = Scalar
         inner_struct = Scalar()
     elif ast.name in ('batch', 'slice'):

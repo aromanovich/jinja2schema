@@ -287,3 +287,15 @@ def test_basics_13():  # test dictsort
     '''
     with pytest.raises(MergeException):
         infer(parse(template))
+
+
+def test_raw_1():
+    template = '''
+    {% raw %}
+        {{ x }}
+    {% endraw %}
+    '''
+    struct = infer(parse(template))
+    expected_struct = Dictionary()
+    assert_structures_equal(struct, expected_struct)
+
