@@ -207,6 +207,34 @@ def visit_cond_expr(ast, ctx):
         struct[ast.test.node.name].may_be_defined = True
     return rtype, struct
 
+@visits_expr(nodes.Call)
+def visit_call(ast, ctx):
+    if isinstance(ast.node, nodes.Name):
+        if ast.node.name == 'range':
+            merge(ctx.get_current_inner_struct(ast), List(Unknown()))  # validate
+            struct = Dictionary()
+            for arg in ast.args:
+                arg_rtype, arg_struct = visit_expr(arg, Context(rtype_cls=Scalar))
+                struct = merge(struct, arg_struct)
+            return List(Scalar()), struct
+        elif ast.node.name == 'lipsum':
+            merge(ctx.get_current_inner_struct(ast), Scalar())  # validate
+            struct = Dictionary()
+            for arg in ast.args:
+                arg_rtype, arg_struct = visit_expr(arg, Context(rtype_cls=Scalar))
+                struct = merge(struct, arg_struct)
+            for kwarg in ast.kwargs:
+                arg_rtype, arg_struct = visit_expr(kwarg.value, Context(rtype_cls=Scalar))
+                struct = merge(struct, arg_struct)
+            return Scalar(), struct
+        elif ast.node.name == 'dict':
+            merge(ctx.get_current_inner_struct(ast), Dictionary())  # validate
+            if ast.args:
+                raise UnsupportedSyntax(ast, 'dict accepts only keyword arguments')
+            return _visit_dict(ast, ctx, [(kwarg.key, kwarg.value) for kwarg in ast.kwargs])
+        else:  # ast.node.name in ('joiner', 'cycler'):
+            raise UnsupportedSyntax(ast, '"{}" call is not supported yet'.format(ast.node.name))
+
 
 @visits_expr(nodes.Filter)
 def visit_filter(ast, ctx):
@@ -245,6 +273,8 @@ def visit_filter(ast, ctx):
         elif ast.name == 'length':
             el_struct = Unknown()
             rtype = Scalar
+            # just to validate:
+            merge(ctx.get_current_inner_struct(ast), Scalar())
         else:
             el_struct = Scalar()
             rtype = Scalar
@@ -317,19 +347,31 @@ def visit_list(ast, ctx):
     return rtype, struct
 
 
-@visits_expr(nodes.Dict)
-def visit_dict(ast, ctx):
+def _visit_dict(ast, ctx, items):
+    """A common logic behind nodes.Dict and nodes.Call (``{{ dict(a=1) }}``)
+    visitors.
+
+    :param items: a list of (key, value); key may be either ast or string
+    """
     rtype = Dictionary(linenos=[ast.lineno], constant=True)
     struct = Dictionary()
-    for item in ast.items:
-        key_rtype, key_struct = visit_expr(item.key, Context(rtype_cls=Scalar))
-        struct = merge(struct, key_struct)
-        assert isinstance(key_rtype, Scalar)
-        value_rtype, value_struct = visit_expr(item.value, ctx)
+    for key, value in items:
+        value_rtype, value_struct = visit_expr(value, Context(rtype_cls=Unknown))
         struct = merge(struct, value_struct)
-        if isinstance(item.key, nodes.Const):
-            rtype[item.key.value] = value_rtype
+        if isinstance(key, nodes.Node):
+            key_rtype, key_struct = visit_expr(key, Context(rtype_cls=Scalar))
+            struct = merge(struct, key_struct)
+            merge(key_rtype, Scalar())  # just to validate
+            if isinstance(key, nodes.Const):
+                rtype[key.value] = value_rtype
+        elif isinstance(key, basestring):
+            rtype[key] = value_rtype
     return rtype, struct
+
+
+@visits_expr(nodes.Dict)
+def visit_dict(ast, ctx):
+    return _visit_dict(ast, ctx, [(item.key, item.value) for item in ast.items])
 
 
 # Statement visitors
@@ -355,6 +397,8 @@ def visit_for(ast, ctx):
         Context(
             rtype_cls=Unknown,
             inner_struct=List(target_struct, linenos=[ast.lineno])))
+
+    merge(iter_rtype, List(target_struct))
 
     return merge(merge(iter_struct, body_struct), else_struct)
 
@@ -461,6 +505,7 @@ def visit(ast, ctx):
         structure = visit_stmt(ast, ctx)
     elif isinstance(ast, nodes.Expr):
         rtype, structure = visit_expr(ast, ctx)
+        # merge(rtype, ctx.get_current_rtype(ast))
     return structure
 
 

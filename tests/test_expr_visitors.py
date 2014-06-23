@@ -2,7 +2,8 @@ import pytest
 from jinja2 import nodes
 from jinja2schema.core import (parse, Context, MergeException, UnsupportedSyntax,
                                visit_getitem, visit_cond_expr, visit_test,
-                               visit_getattr, visit_compare, visit_filter)
+                               visit_getattr, visit_compare, visit_filter,
+                               visit_call)
 from jinja2schema.model import Dictionary, Scalar, List, Unknown
 from .util import assert_structures_equal, assert_rtypes_equal
 
@@ -230,3 +231,16 @@ def test_test_2():
         'x': Unknown()
     })
     assert_structures_equal(struct, expected_struct, check_linenos=False)
+
+
+def test_call_dict():
+    template = '''{{ dict(x=dict(a=1, b=2).c) }}'''
+    call_ast = parse(template).find(nodes.Call)
+    rtype, struct = visit_call(call_ast, Context(rtype_cls=Unknown))
+    expected_rtype = Dictionary({
+        'x': Dictionary({
+            'a': Scalar(constant=True),
+            'b': Scalar(constant=True)
+        }, constant=True)
+    }, constant=True)
+    assert_rtypes_equal(rtype, expected_rtype)

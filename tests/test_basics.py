@@ -299,3 +299,51 @@ def test_raw_1():
     expected_struct = Dictionary()
     assert_structures_equal(struct, expected_struct)
 
+
+def test_call_range():
+    template = '''
+    {% for number in range(10 - users|length) %}
+        {{ number }}
+    {% endfor %}
+    '''
+    struct = infer(parse(template))
+    expected_struct = Dictionary({
+        'users': List(Unknown()),
+    })
+    assert_structures_equal(struct, expected_struct)
+
+    template = '''
+    {% for number in range(10 - users|length) %}
+        {{ number.field }}
+    {% endfor %}
+    '''
+    with pytest.raises(MergeException):
+        infer(parse(template))
+
+    template = '{{ range(10 - users|length) }}'
+    with pytest.raises(MergeException):
+        infer(parse(template))
+
+
+def test_call_lipsum():
+    template = '''
+    {{ lipsum(n=a.field) }}
+    '''
+    struct = infer(parse(template))
+    expected_struct = Dictionary({
+        'a': Dictionary({
+            'field': Scalar(),
+        }),
+    })
+    assert_structures_equal(struct, expected_struct, check_linenos=False)
+
+    template = '''
+    {% for number in lipsum(n=10) %}
+    {% endfor %}
+    '''
+    with pytest.raises(MergeException):
+        infer(parse(template))
+
+    template = '{{ lipsum(n=10).field }}'
+    with pytest.raises(MergeException):
+        infer(parse(template))
