@@ -16,15 +16,25 @@ from .model import Scalar, Dictionary, List, Unknown, Tuple
 
 
 class Context(object):
-    def __init__(self, rtype_cls=Scalar, inner_struct=None):
-        self.rtype_cls = rtype_cls
-        self.inner_struct = inner_struct
+    def __init__(self, return_struct=None, predicted_struct=None):
+        self.return_struct = return_struct if return_struct is not None else Unknown()
+        self.predicted_struct = predicted_struct
 
     def get_current_rtype(self, ast):
-        return self.rtype_cls(linenos=[ast.lineno])
+        return self.return_struct
 
-    def get_current_inner_struct(self, ast):
-        return self.inner_struct if self.inner_struct else self.get_current_rtype(ast)
+    def get_predicted_struct(self, ast):
+        return self.predicted_struct
+
+    def meet(self, struct):
+        try:
+            if self.predicted_struct:
+                merge(self.predicted_struct, struct)
+        except MergeException:
+            # todo reraise other exception
+            raise
+        else:
+            return True
 
 
 class MergeException(Exception):
@@ -40,6 +50,8 @@ class UnsupportedSyntax(Exception):
 
 
 def merge(fst, snd):
+    assert fst
+    assert snd
     assert (not (fst.linenos and snd.linenos) or
             max(fst.linenos) <= min(snd.linenos))
 
@@ -61,9 +73,12 @@ def merge(fst, snd):
     elif isinstance(fst, List) and isinstance(snd, List):
         result = List(merge(fst.el_struct, snd.el_struct))
     elif isinstance(fst, Tuple) and isinstance(snd, Tuple):
-        if len(fst.el_structs) != len(snd.el_structs):
-            raise MergeException(fst, snd)
-        result = Tuple([merge(a, b) for a, b in zip(fst.el_structs, snd.el_structs)])
+        if fst.el_structs is snd.el_structs is None:
+            result = Tuple(None)
+        else:
+            if len(fst.el_structs) != len(snd.el_structs):
+                raise MergeException(fst, snd)
+            result = Tuple([merge(a, b) for a, b in zip(fst.el_structs, snd.el_structs)])
     else:
         raise MergeException(fst, snd)
     result.linenos = list(sorted(set(fst.linenos + snd.linenos)))
@@ -131,35 +146,37 @@ def visit_compare(ast, ctx):
 @visits_expr(nodes.Slice)
 def visit_slice(ast, ctx):
     nodes = [node for node in [ast.start, ast.stop, ast.step] if node is not None]
-    return Unknown(), visit_nodes_and_merge(nodes, Context(rtype_cls=Scalar))
+    return Unknown(), visit_nodes_and_merge(nodes, Scalar)
 
 
 @visits_expr(nodes.Getitem)
 def visit_getitem(ast, ctx):
-    curr_struct = ctx.get_current_inner_struct(ast)
+    predicted_struct = ctx.get_predicted_struct(ast)
     arg = ast.arg
     if isinstance(arg, nodes.Const):
         if isinstance(arg.value, int):
-            inner_struct = List(curr_struct, linenos=[arg.lineno])
+            predicted_struct = List(predicted_struct, linenos=[arg.lineno])
         elif isinstance(arg.value, basestring):
-            inner_struct = Dictionary({arg.value: curr_struct}, lineno=[arg.lineno])
+            predicted_struct = Dictionary({arg.value: predicted_struct}, lineno=[arg.lineno])
         else:
             raise UnsupportedSyntax(arg, '{} is not supported as an index for a list or'
                                          ' a key for a dictionary'.format(arg.value))
     else:
-        inner_struct = List(curr_struct, linenos=[arg.lineno])
-    arg_rtype, arg_struct = visit_expr(arg, Context(rtype_cls=Scalar))
-    rtype, struct = visit_expr(ast.node, Context(rtype_cls=ctx.rtype_cls,
-                                                 inner_struct=inner_struct))
+        predicted_struct = List(predicted_struct, linenos=[arg.lineno])
+
+    _, arg_struct = visit_expr(arg, Context(
+        predicted_struct=Scalar(lineno=[arg.lineno])))
+    rtype, struct = visit_expr(ast.node, Context(
+        return_struct=ctx.get_current_rtype(ast), predicted_struct=predicted_struct))
     return rtype, merge(struct, arg_struct)
 
 
 @visits_expr(nodes.Getattr)
 def visit_getattr(ast, ctx):
     context = Context(
-        rtype_cls=ctx.rtype_cls,
-        inner_struct=Dictionary({
-            ast.attr: ctx.get_current_inner_struct(ast),
+        return_struct=ctx.return_struct,
+        predicted_struct=Dictionary({
+            ast.attr: ctx.get_predicted_struct(ast),
         }, linenos=[ast.lineno]))
     return visit_expr(ast.node, context)
 
@@ -167,17 +184,19 @@ def visit_getattr(ast, ctx):
 @visits_expr(nodes.Test)
 def visit_test(ast, ctx):
     if ast.name in ('divisibleby', 'escaped', 'even', 'lower', 'odd', 'upper'):
-        inner_struct = Scalar(linenos=[ast.lineno])
+        ctx.meet(Scalar())
+        predicted_struct = Scalar(linenos=[ast.lineno])
     elif ast.name in ('defined', 'undefined', 'equalto', 'iterable', 'mapping',
                       'none', 'number', 'sameas', 'sequence', 'string'):
-        inner_struct = Unknown(linenos=[ast.lineno])
+        predicted_struct = Unknown(linenos=[ast.lineno])
     else:
         raise UnsupportedSyntax(ast, 'unknown test "{}"'.format(ast.name))
-    rtype, struct = visit_expr(ast.node, Context(rtype_cls=ctx.rtype_cls, inner_struct=inner_struct))
+    rtype, struct = visit_expr(ast.node, Context(return_struct=Scalar(), predicted_struct=predicted_struct))
     if ast.name == 'divisibleby':
         if not ast.args:
             raise UnsupportedSyntax(ast, 'divisibleby must have an argument')
-        arg_rtype, arg_struct = visit_expr(ast.args[0], Context(rtype_cls=Scalar))
+        _, arg_struct = visit_expr(ast.args[0],
+                                   Context(predicted_struct=Scalar(linenos=[ast.lineno])))
         struct = merge(arg_struct, struct)
     return rtype, struct
 
@@ -185,50 +204,52 @@ def visit_test(ast, ctx):
 @visits_expr(nodes.Name)
 def visit_name(ast, ctx):
     return ctx.get_current_rtype(ast), Dictionary({
-        ast.name: ctx.get_current_inner_struct(ast)
+        ast.name: ctx.get_predicted_struct(ast)
     })
 
 
 @visits_expr(nodes.Concat)
 def visit_concat(ast, ctx):
-    return Scalar(), visit_nodes_and_merge(ast.nodes, ctx)
+    ctx.meet(Scalar())
+    return Scalar(), visit_nodes_and_merge(ast.nodes, Scalar)
 
 
 @visits_expr(nodes.CondExpr)
 def visit_cond_expr(ast, ctx):
-    test_rtype, test_struct = visit_expr(ast.test, Context(rtype_cls=Unknown))
+    test_rtype, test_struct = visit_expr(ast.test, Context(predicted_struct=Unknown()))
     if_rtype, if_struct = visit_expr(ast.expr1, ctx)
     else_rtype, else_struct = visit_expr(ast.expr2, ctx)
     struct = merge(merge(if_struct, test_struct), else_struct)
     rtype = merge_rtypes(if_rtype, else_rtype)
 
     if (isinstance(ast.test, nodes.Test) and isinstance(ast.test.node, nodes.Name) and
-        ast.test.name in ('defined', 'undefined')):
+            ast.test.name in ('defined', 'undefined')):
         struct[ast.test.node.name].may_be_defined = True
     return rtype, struct
+
 
 @visits_expr(nodes.Call)
 def visit_call(ast, ctx):
     if isinstance(ast.node, nodes.Name):
         if ast.node.name == 'range':
-            merge(ctx.get_current_inner_struct(ast), List(Unknown()))  # validate
+            ctx.meet(List(Unknown()))
             struct = Dictionary()
             for arg in ast.args:
-                arg_rtype, arg_struct = visit_expr(arg, Context(rtype_cls=Scalar))
+                arg_rtype, arg_struct = visit_expr(arg, Context(predicted_struct=Scalar()))
                 struct = merge(struct, arg_struct)
             return List(Scalar()), struct
         elif ast.node.name == 'lipsum':
-            merge(ctx.get_current_inner_struct(ast), Scalar())  # validate
+            ctx.meet(Scalar())
             struct = Dictionary()
             for arg in ast.args:
-                arg_rtype, arg_struct = visit_expr(arg, Context(rtype_cls=Scalar))
+                arg_rtype, arg_struct = visit_expr(arg, Context(predicted_struct=Scalar()))
                 struct = merge(struct, arg_struct)
             for kwarg in ast.kwargs:
-                arg_rtype, arg_struct = visit_expr(kwarg.value, Context(rtype_cls=Scalar))
+                arg_rtype, arg_struct = visit_expr(kwarg.value, Context(predicted_struct=Scalar()))
                 struct = merge(struct, arg_struct)
             return Scalar(), struct
         elif ast.node.name == 'dict':
-            merge(ctx.get_current_inner_struct(ast), Dictionary())  # validate
+            ctx.meet(Dictionary())
             if ast.args:
                 raise UnsupportedSyntax(ast, 'dict accepts only keyword arguments')
             return _visit_dict(ast, ctx, [(kwarg.key, kwarg.value) for kwarg in ast.kwargs])
@@ -238,70 +259,66 @@ def visit_call(ast, ctx):
 
 @visits_expr(nodes.Filter)
 def visit_filter(ast, ctx):
-    rtype = ctx.rtype_cls
-
     if ast.name in ('abs', 'striptags', 'capitalize', 'center', 'escape', 'filesizeformat',
                     'float', 'forceescape', 'format', 'indent', 'int', 'replace', 'round',
                     'safe', 'string', 'striptags', 'title', 'trim', 'truncate', 'upper',
                     'urlencode', 'urlize', 'wordcount', 'wordwrap', 'e'):
-        rtype = Scalar
-        inner_struct = Scalar()
+        ctx.meet(Scalar())
+        node_struct = Scalar()
     elif ast.name in ('batch', 'slice'):
-        inner_struct = merge(
+        ctx.meet(List(List(Unknown())))
+        node_struct = merge(
             List(List(Unknown())),
-            ctx.get_current_inner_struct(ast)
+            ctx.get_predicted_struct(ast)
         ).el_struct
     elif ast.name == 'default':
-        default_value_rtype, default_value_struct = visit_expr(ast.args[0], Context(rtype_cls=Unknown))
-        inner_struct = merge(
-            ctx.get_current_inner_struct(ast),
+        default_value_rtype, default_value_struct = visit_expr(
+            ast.args[0], Context(predicted_struct=Unknown(linenos=[ast.args[0].lineno])))
+        node_struct = merge(
+            ctx.get_predicted_struct(ast),
             default_value_rtype,
         )
-        inner_struct.used_with_default = True
+        node_struct.used_with_default = True
     elif ast.name == 'dictsort':
-        rtype = lambda *a, **kw: List(Tuple([Scalar(), Unknown()]))
-        key_struct = Scalar()  # keys may only be scalars
-        value_struct = Unknown()  # anything
-        merge(  # merge just to validate
-            ctx.get_current_inner_struct(ast),
-            List(Tuple([key_struct, value_struct])),
-        )
-        inner_struct = Dictionary()
-    elif ast.name in ('first', 'join', 'last', 'length', 'random', 'sum'):
+        ctx.meet(List(Tuple([Scalar(), Unknown()])))
+        node_struct = Dictionary()
+    elif ast.name in ('first', 'last', 'random', 'length', 'join', 'sum'):
         if ast.name in ('first', 'last', 'random'):
-            el_struct = ctx.get_current_inner_struct(ast)
+            el_struct = ctx.get_predicted_struct(ast)
         elif ast.name == 'length':
+            ctx.meet(Scalar())
             el_struct = Unknown()
-            rtype = Scalar
-            # just to validate:
-            merge(ctx.get_current_inner_struct(ast), Scalar())
         else:
+            ctx.meet(Scalar())
             el_struct = Scalar()
-            rtype = Scalar
-        inner_struct = List(el_struct)
+        node_struct = List(el_struct)
     elif ast.name in ('groupby', 'map', 'reject', 'rejectattr', 'select', 'selectattr', 'sort'):
-        inner_struct = merge(
+        ctx.meet(List(Unknown()))
+        node_struct = merge(
             List(Unknown()),
-            ctx.get_current_inner_struct(ast)
+            ctx.get_predicted_struct(ast)
         )
     elif ast.name == 'list':
-        rtype = lambda *a, **kw: List(Scalar())
-        inner_struct = merge(
-            List(Unknown()),
-            ctx.get_current_inner_struct(ast)
+        ctx.meet(List(Scalar()))
+        node_struct = merge(
+            List(Scalar()),
+            ctx.get_predicted_struct(ast)
         ).el_struct
     elif ast.name == 'pprint':
-        rtype = Scalar
-        inner_struct = ctx.get_current_inner_struct(ast)
+        ctx.meet(Scalar())
+        node_struct = ctx.get_predicted_struct(ast)
     elif ast.name == 'xmlattr':
-        rtype = Scalar
-        inner_struct = Dictionary()
+        ctx.meet(Scalar())
+        node_struct = Dictionary()
     elif ast.name == 'attr':
         raise UnsupportedSyntax(ast, 'attr filter is not supported')
     else:
         raise UnsupportedSyntax(ast, 'unknown filter')
 
-    return visit_expr(ast.node, Context(rtype_cls=rtype, inner_struct=inner_struct))
+    return visit_expr(ast.node, Context(
+        return_struct=ctx.return_struct,
+        predicted_struct=node_struct
+    ))
 
 
 # :class:`nodes.Literal` visitors
@@ -313,12 +330,13 @@ def visit_template_data(ast, ctx):
 
 @visits_expr(nodes.Const)
 def visit_const(ast, ctx):
-    rtype = Scalar(linenos=[ast.lineno], constant=True)
-    return rtype, Dictionary()
+    ctx.meet(Scalar())
+    return Scalar(linenos=[ast.lineno], constant=True), Dictionary()
 
 
 @visits_expr(nodes.Tuple)
 def visit_tuple(ast, ctx):
+    ctx.meet(Tuple(None))
     struct = Dictionary()
 
     rtypes = []
@@ -333,11 +351,13 @@ def visit_tuple(ast, ctx):
 
 @visits_expr(nodes.List)
 def visit_list(ast, ctx):
+    ctx.meet(List(Unknown()))
     struct = Dictionary()
 
+    #predicted_struct = merge(List(Unknown()), ctx.get_predicted_struct(ast)).el_struct
     el_rtype = None
     for item in ast.items:
-        item_rtype, item_struct = visit_expr(item, Context())
+        item_rtype, item_struct = visit_expr(item, Context(predicted_struct=Unknown()))
         struct = merge(struct, item_struct)
         if el_rtype is None:
             el_rtype = item_rtype
@@ -356,10 +376,14 @@ def _visit_dict(ast, ctx, items):
     rtype = Dictionary(linenos=[ast.lineno], constant=True)
     struct = Dictionary()
     for key, value in items:
-        value_rtype, value_struct = visit_expr(value, Context(rtype_cls=Unknown))
+        value_rtype, value_struct = visit_expr(value, Context(
+            return_struct=Unknown(),
+            predicted_struct=Unknown(linenos=[value.lineno])))
         struct = merge(struct, value_struct)
         if isinstance(key, nodes.Node):
-            key_rtype, key_struct = visit_expr(key, Context(rtype_cls=Scalar))
+            key_rtype, key_struct = visit_expr(key, Context(
+                return_struct=Scalar(),
+                predicted_struct=Scalar(linenos=[key.lineno])))
             struct = merge(struct, key_struct)
             merge(key_rtype, Scalar())  # just to validate
             if isinstance(key, nodes.Const):
@@ -371,6 +395,7 @@ def _visit_dict(ast, ctx, items):
 
 @visits_expr(nodes.Dict)
 def visit_dict(ast, ctx):
+    ctx.meet(Dictionary())
     return _visit_dict(ast, ctx, [(item.key, item.value) for item in ast.items])
 
 
@@ -378,8 +403,8 @@ def visit_dict(ast, ctx):
 
 @visits_stmt(nodes.For)
 def visit_for(ast, ctx):
-    body_struct = visit_nodes_and_merge(ast.body, ctx)
-    else_struct = visit_nodes_and_merge(ast.else_, ctx)
+    body_struct = visit_nodes_and_merge(ast.body, Scalar)
+    else_struct = visit_nodes_and_merge(ast.else_, Scalar)
 
     if 'loop' in body_struct:
         # exclude a special `loop` variable from the body structure
@@ -395,8 +420,8 @@ def visit_for(ast, ctx):
     iter_rtype, iter_struct = visit_expr(
         ast.iter,
         Context(
-            rtype_cls=Unknown,
-            inner_struct=List(target_struct, linenos=[ast.lineno])))
+            return_struct=Unknown(),
+            predicted_struct=List(target_struct, linenos=[ast.lineno])))
 
     merge(iter_rtype, List(target_struct))
 
@@ -405,9 +430,10 @@ def visit_for(ast, ctx):
 
 @visits_stmt(nodes.If)
 def visit_if(ast, ctx):
-    test_rtype, test_struct = visit_expr(ast.test, Context(rtype_cls=Unknown))
-    if_struct = visit_nodes_and_merge(ast.body, ctx)
-    else_struct = visit_nodes_and_merge(ast.else_, ctx) if ast.else_ else Dictionary()
+    test_rtype, test_struct = visit_expr(ast.test, Context(
+        return_struct=Unknown(), predicted_struct=Unknown(linenos=[ast.test.lineno])))
+    if_struct = visit_nodes_and_merge(ast.body, Scalar)
+    else_struct = visit_nodes_and_merge(ast.else_, Scalar) if ast.else_ else Dictionary()
     struct = merge(merge(test_struct, if_struct), else_struct)
 
     if isinstance(ast.test, nodes.Test) and isinstance(ast.test.node, nodes.Name):
@@ -427,7 +453,7 @@ def visit_assign(ast, ctx):
     struct = Dictionary()
     if (isinstance(ast.target, nodes.Name) or
             (isinstance(ast.target, nodes.Tuple) and isinstance(ast.node, nodes.Tuple))):
-        context = Context(rtype_cls=Unknown)
+        context = Context(return_struct=Unknown(), predicted_struct=Unknown())
         variables = []
         if not (isinstance(ast.target, nodes.Tuple) and isinstance(ast.node, nodes.Tuple)):
             variables.append((ast.target.name, ast.node))
@@ -451,7 +477,7 @@ def visit_assign(ast, ctx):
             tuple_items.append(var_struct)
             struct = merge(struct, Dictionary({name_ast.name: var_struct}))
         var_rtype, var_struct = visit_expr(
-            ast.node, Context(rtype_cls=lambda **kw: Tuple(tuple_items, **kw)))
+            ast.node, Context(return_struct=Unknown(), predicted_struct=Tuple(tuple_items)))
         return merge(struct, var_struct)
     else:
         raise UnsupportedSyntax(ast, 'unsupported assignment')
@@ -459,18 +485,19 @@ def visit_assign(ast, ctx):
 
 @visits_stmt(nodes.Output)
 def visit_output(ast, ctx):
-    return visit_nodes_and_merge(ast.nodes, ctx)
+    return visit_nodes_and_merge(ast.nodes, Scalar)
 
 
 @visits_stmt(nodes.Template)
 def visit_template(ast, ctx):
-    return visit_nodes_and_merge(ast.body, ctx)
+    return visit_nodes_and_merge(ast.body, Scalar)
 
 
-def visit_nodes_and_merge(nodes, ctx):
+def visit_nodes_and_merge(nodes, predicted_struct_class):
     rv = Dictionary()
     for node in nodes:
-        rv = merge(rv, visit(node, ctx))
+        rv = merge(rv, visit(node, Context(return_struct=Scalar(),
+                                           predicted_struct=predicted_struct_class(linenos=[node.lineno]))))
     return rv
 
 
@@ -482,13 +509,10 @@ def visit_stmt(ast, ctx):
                 visitor = visitor_
     if not visitor:
         raise Exception('stmt visitor for {} is not found'.format(type(ast)))
-    rv = visitor(ast, ctx)
-    assert isinstance(rv, Dictionary)
-    return rv
+    return visitor(ast, ctx)
 
 
 def visit_expr(ast, ctx):
-    import inspect
     visitor = expr_visitors.get(type(ast))
     if not visitor:
         for node_cls, visitor_ in expr_visitors.iteritems():
@@ -505,7 +529,6 @@ def visit(ast, ctx):
         structure = visit_stmt(ast, ctx)
     elif isinstance(ast, nodes.Expr):
         rtype, structure = visit_expr(ast, ctx)
-        # merge(rtype, ctx.get_current_rtype(ast))
     return structure
 
 
@@ -523,7 +546,7 @@ def infer(ast):
     """
     :type ast: :class:`nodes.Template`
     """
-    rv = visit_nodes_and_merge(ast.body, Context())
+    rv = visit_nodes_and_merge(ast.body, Scalar)
     return _post_process(rv)
 
 

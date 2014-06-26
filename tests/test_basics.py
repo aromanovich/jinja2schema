@@ -153,7 +153,7 @@ def test_basics_4():
     expected_struct = Dictionary({
         'configuration': Scalar(may_be_defined=True, constant=False, linenos=[6]),
         'queue': Scalar(may_be_defined=True, constant=False, linenos=[9]),
-        'timestamp': Unknown(constant=False, linenos=[7])
+        'timestamp': Scalar(constant=False, linenos=[7])
     })
     assert_structures_equal(struct, expected_struct)
 

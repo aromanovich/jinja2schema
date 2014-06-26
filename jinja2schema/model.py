@@ -93,7 +93,7 @@ class List(Variable):
 
 class Tuple(Variable):
     def __init__(self, el_structs, **kwargs):
-        self.el_structs = tuple(el_structs)
+        self.el_structs = tuple(el_structs) if el_structs is not None else None
         super(Tuple, self).__init__(**kwargs)
 
     def __eq__(self, other):
