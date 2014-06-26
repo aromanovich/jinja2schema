@@ -103,9 +103,9 @@ def visits_stmt(node_cls):
     def decorator(func):
         stmt_visitors[node_cls] = func
         @functools.wraps(func)
-        def wrapped_func(ast, ctx):
+        def wrapped_func(ast):
             assert isinstance(ast, node_cls)
-            return func(ast, ctx)
+            return func(ast)
         return wrapped_func
     return decorator
 
@@ -337,15 +337,14 @@ def visit_const(ast, ctx):
 @visits_expr(nodes.Tuple)
 def visit_tuple(ast, ctx):
     ctx.meet(Tuple(None))
-    struct = Dictionary()
 
-    rtypes = []
+    struct = Dictionary()
+    item_structs = []
     for item in ast.items:
         item_rtype, item_struct = visit_expr(item, ctx)
-        rtypes.append(item_rtype)
+        item_structs.append(item_rtype)
         struct = merge(struct, item_struct)
-
-    rtype = Tuple(rtypes, linenos=[ast.lineno], constant=True)
+    rtype = Tuple(item_structs, linenos=[ast.lineno], constant=True)
     return rtype, struct
 
 
@@ -354,10 +353,10 @@ def visit_list(ast, ctx):
     ctx.meet(List(Unknown()))
     struct = Dictionary()
 
-    #predicted_struct = merge(List(Unknown()), ctx.get_predicted_struct(ast)).el_struct
+    predicted_struct = merge(List(Unknown()), ctx.get_predicted_struct(ast)).el_struct
     el_rtype = None
     for item in ast.items:
-        item_rtype, item_struct = visit_expr(item, Context(predicted_struct=Unknown()))
+        item_rtype, item_struct = visit_expr(item, Context(predicted_struct=predicted_struct))
         struct = merge(struct, item_struct)
         if el_rtype is None:
             el_rtype = item_rtype
@@ -373,19 +372,16 @@ def _visit_dict(ast, ctx, items):
 
     :param items: a list of (key, value); key may be either ast or string
     """
+    ctx.meet(Dictionary())
     rtype = Dictionary(linenos=[ast.lineno], constant=True)
     struct = Dictionary()
     for key, value in items:
         value_rtype, value_struct = visit_expr(value, Context(
-            return_struct=Unknown(),
             predicted_struct=Unknown(linenos=[value.lineno])))
         struct = merge(struct, value_struct)
         if isinstance(key, nodes.Node):
-            key_rtype, key_struct = visit_expr(key, Context(
-                return_struct=Scalar(),
-                predicted_struct=Scalar(linenos=[key.lineno])))
+            key_rtype, key_struct = visit_expr(key, Context(predicted_struct=Scalar(linenos=[key.lineno])))
             struct = merge(struct, key_struct)
-            merge(key_rtype, Scalar())  # just to validate
             if isinstance(key, nodes.Const):
                 rtype[key.value] = value_rtype
         elif isinstance(key, basestring):
@@ -402,7 +398,7 @@ def visit_dict(ast, ctx):
 # Statement visitors
 
 @visits_stmt(nodes.For)
-def visit_for(ast, ctx):
+def visit_for(ast):
     body_struct = visit_nodes_and_merge(ast.body, Scalar)
     else_struct = visit_nodes_and_merge(ast.else_, Scalar)
 
@@ -429,7 +425,7 @@ def visit_for(ast, ctx):
 
 
 @visits_stmt(nodes.If)
-def visit_if(ast, ctx):
+def visit_if(ast):
     test_rtype, test_struct = visit_expr(ast.test, Context(
         return_struct=Unknown(), predicted_struct=Unknown(linenos=[ast.test.lineno])))
     if_struct = visit_nodes_and_merge(ast.body, Scalar)
@@ -449,7 +445,7 @@ def visit_if(ast, ctx):
 
 
 @visits_stmt(nodes.Assign)
-def visit_assign(ast, ctx):
+def visit_assign(ast):
     struct = Dictionary()
     if (isinstance(ast.target, nodes.Name) or
             (isinstance(ast.target, nodes.Tuple) and isinstance(ast.node, nodes.Tuple))):
@@ -484,12 +480,12 @@ def visit_assign(ast, ctx):
 
 
 @visits_stmt(nodes.Output)
-def visit_output(ast, ctx):
+def visit_output(ast):
     return visit_nodes_and_merge(ast.nodes, Scalar)
 
 
 @visits_stmt(nodes.Template)
-def visit_template(ast, ctx):
+def visit_template(ast):
     return visit_nodes_and_merge(ast.body, Scalar)
 
 
@@ -501,7 +497,7 @@ def visit_nodes_and_merge(nodes, predicted_struct_class):
     return rv
 
 
-def visit_stmt(ast, ctx):
+def visit_stmt(ast):
     visitor = stmt_visitors.get(type(ast))
     if not visitor:
         for node_cls, visitor_ in stmt_visitors.iteritems():
@@ -509,7 +505,7 @@ def visit_stmt(ast, ctx):
                 visitor = visitor_
     if not visitor:
         raise Exception('stmt visitor for {} is not found'.format(type(ast)))
-    return visitor(ast, ctx)
+    return visitor(ast)
 
 
 def visit_expr(ast, ctx):
@@ -526,7 +522,7 @@ def visit_expr(ast, ctx):
 
 def visit(ast, ctx):
     if isinstance(ast, nodes.Stmt):
-        structure = visit_stmt(ast, ctx)
+        structure = visit_stmt(ast)
     elif isinstance(ast, nodes.Expr):
         rtype, structure = visit_expr(ast, ctx)
     return structure

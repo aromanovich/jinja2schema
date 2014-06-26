@@ -5,9 +5,6 @@ import pytest
 
 from .util import assert_structures_equal
 
-def get_context(predicted_struct=None):
-    return Context(return_struct=Scalar(), predicted_struct=predicted_struct or Scalar())
-
 
 def test_for_1():
     template = '''
@@ -16,7 +13,7 @@ def test_for_1():
     {% endfor %}
     '''
     ast = parse(template).find(nodes.For)
-    struct = visit_for(ast, get_context())
+    struct = visit_for(ast)
     expected_struct = Dictionary({
         'a': Dictionary({
             'b': List(Scalar(linenos=[3]), linenos=[2])
@@ -53,7 +50,7 @@ def test_for_3():
     {% endfor %}
     '''
     ast = parse(template).find(nodes.For)
-    struct = visit_for(ast, get_context())
+    struct = visit_for(ast)
 
     expected_struct = Dictionary({
         'list': List(Tuple((
@@ -70,7 +67,7 @@ def test_assign_1():
     template = '''{% set a = b %}'''
     ast = parse(template).find(nodes.Assign)
 
-    struct = visit_assign(ast, get_context())
+    struct = visit_assign(ast)
     expected_struct = Dictionary({
         'a': Unknown(constant=True),
         'b': Unknown()
@@ -82,7 +79,7 @@ def test_assign_2():
     template = '''{% set y = "-" ~ y %}'''
     ast = parse(template).find(nodes.Assign)
 
-    struct = visit_assign(ast, get_context())
+    struct = visit_assign(ast)
     expected_struct = Dictionary({
         'y': Scalar()
     })
@@ -93,19 +90,14 @@ def test_assign_3():
     template = '''{% set a, b = {'a': 1, 'b': 2} %}'''
     ast = parse(template).find(nodes.Assign)
     with pytest.raises(MergeException):
-        visit_assign(ast, get_context())
-    #struct = visit_assign(ast, get_context())
-    #assert_structures_equal(struct, Dictionary({
-    #    'a': Unknown(constant=True),
-    #    'b': Unknown(constant=True),
-    #}), check_linenos=False)
+        visit_assign(ast)
 
 
 def test_assign_4():
     template = '''{% set a, b = 1, {'gsom': 'gsom', z: z} %}'''
     ast = parse(template).find(nodes.Assign)
 
-    struct = visit_assign(ast, get_context())
+    struct = visit_assign(ast)
     expected_struct = Dictionary({
         'a': Scalar(constant=True),
         'b': Dictionary(data={
@@ -124,7 +116,7 @@ def test_assign_5():
     ] %}
     '''
     ast = parse(template).find(nodes.Assign)
-    struct = visit_assign(ast, get_context())
+    struct = visit_assign(ast)
     expected_struct = Dictionary({
         'weights': List(Tuple([
             Scalar(constant=True),
@@ -145,7 +137,7 @@ def test_assign_6():
     '''
     ast = parse(template).find(nodes.Assign)
     with pytest.raises(MergeException):
-        visit_assign(ast, get_context())
+        visit_assign(ast)
 
 
 def test_if_1():
@@ -156,7 +148,7 @@ def test_if_1():
     {% endif %}
     '''
     ast = parse(template).find(nodes.If)
-    struct = visit_if(ast, get_context())
+    struct = visit_if(ast)
 
     expected_struct = Dictionary({
         'z': Dictionary({
