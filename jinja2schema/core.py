@@ -182,9 +182,9 @@ def visit_getitem(ast, ctx):
 def visit_getattr(ast, ctx):
     context = Context(
         return_struct=ctx.return_struct,
-        predicted_struct=Dictionary({
+        predicted_struct=Dictionary.from_ast(ast, {
             ast.attr: ctx.get_predicted_struct(ast),
-        }, linenos=[ast.lineno]))
+        }))
     return visit_expr(ast.node, context)
 
 
@@ -260,7 +260,7 @@ def visit_call(ast, ctx):
             if ast.args:
                 raise UnsupportedSyntax(ast, 'dict accepts only keyword arguments')
             return _visit_dict(ast, ctx, [(kwarg.key, kwarg.value) for kwarg in ast.kwargs])
-        else:  # ast.node.name in ('joiner', 'cycler'):
+        else:
             raise UnsupportedSyntax(ast, '"{}" call is not supported yet'.format(ast.node.name))
 
 

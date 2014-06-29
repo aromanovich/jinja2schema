@@ -116,7 +116,7 @@ def test_basics_3():
     expected_struct = Dictionary({
         'x': Scalar(linenos=[2, 3, 5, 7]),
     })
-    assert_structures_equal(struct, expected_struct)
+    assert struct == expected_struct
 
     template = '''
     {% if z %}
@@ -130,7 +130,7 @@ def test_basics_3():
     expected_struct = Dictionary({
         'z': Unknown(linenos=[2]),
     })
-    assert_structures_equal(struct, expected_struct)
+    assert struct == expected_struct
 
 
 def test_basics_4():
@@ -155,7 +155,7 @@ def test_basics_4():
         'queue': Scalar(may_be_defined=True, constant=False, linenos=[9]),
         'timestamp': Scalar(constant=False, linenos=[7])
     })
-    assert_structures_equal(struct, expected_struct)
+    assert struct == expected_struct
 
 
 def test_basics_5():
@@ -170,9 +170,9 @@ def test_basics_5():
     expected_struct = Dictionary({
         'items': List(Dictionary({
             'x': Scalar(linenos=[4])
-        }, linenos=[4])),
+        }, linenos=[4]), linenos=[2, 3]),
     })
-    assert_structures_equal(struct, expected_struct, check_linenos=False)
+    assert struct == expected_struct
 
 
 def test_basics_6():
@@ -182,9 +182,9 @@ def test_basics_6():
     '''
     struct = infer(parse(template))
     expected_struct = Dictionary({
-        'items': List(Unknown()),
+        'items': List(Unknown(), linenos=[2]),
     })
-    assert_structures_equal(struct, expected_struct, check_linenos=False)
+    assert struct == expected_struct
 
 
 def test_basics_7():
@@ -196,10 +196,10 @@ def test_basics_7():
     struct = infer(parse(template))
     expected_struct = Dictionary({
         'items': List(Dictionary({
-            'name': Scalar(),
-        })),
+            'name': Scalar(linenos=[3]),
+        }, linenos=[3]), linenos=[2, 3]),
     })
-    assert_structures_equal(struct, expected_struct, check_linenos=False)
+    assert struct == expected_struct
 
 
 def test_basics_8():

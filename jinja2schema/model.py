@@ -93,8 +93,8 @@ class Dictionary(Variable):
 
     def __repr__(self):
         data_repr = _indent(pprint.pformat(self.data), 2)
-        return (u'Dictionary(required={0.required}, constant={0.constant}, '
-                u'linenos={0.linenos}, \n{1}\n)').format(self, data_repr).encode('utf-8')
+        return u'Dictionary(r={0.required}, c={0.constant}, ls={0.linenos}, \n{1}\n)'.format(
+            self, data_repr).encode('utf-8')
 
 
 class List(Variable):
@@ -111,8 +111,8 @@ class List(Variable):
 
     def __repr__(self):
         element_repr = _indent(pprint.pformat(self.el_struct), 2)
-        return (u'List(required={0.required}, constant={0.constant}, '
-                u'linenos={0.linenos}, \n{1}\n)'.format(self, element_repr).encode('utf-8'))
+        return u'List(r={0.required}, c={0.constant}, ls={0.linenos}, \n{1}\n)'.format(
+            self, element_repr).encode('utf-8')
 
 
 class Tuple(Variable):
@@ -129,17 +129,17 @@ class Tuple(Variable):
 
     def __repr__(self):
         el_structs_repr = _indent(pprint.pformat(self.el_structs), 2)
-        return u'Tuple(required={0.required}, linenos={0.linenos} \n{1}\n)'.format(
+        return u'Tuple(r={0.required}, c={0.constant}, ls={0.linenos} \n{1}\n)'.format(
             self, el_structs_repr).encode('utf-8')
 
 
 class Scalar(Variable):
     def __repr__(self):
-        return (u'Scalar(required={0.required}, constant={0.constant}, '
-                u'linenos={0.linenos})').format(self).encode('utf-8')
+        return (u'Scalar(r={0.required}, c={0.constant}, '
+                u'ls={0.linenos})').format(self).encode('utf-8')
 
 
 class Unknown(Variable):
     def __repr__(self):
-        return (u'Unknown(required={0.required}, constant={0.constant}, '
-                u'linenos={0.linenos})'.format(self).encode('utf-8'))
+        return (u'Unknown(r={0.required}, c={0.constant}, '
+                u'ls={0.linenos})'.format(self).encode('utf-8'))

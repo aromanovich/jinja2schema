@@ -1,5 +1,6 @@
 import pytest
 from jinja2 import nodes
+
 from jinja2schema.core import (parse, Context, MergeException, UnsupportedSyntax, UnexpectedExpression,
                                visit_getitem, visit_cond_expr, visit_test,
                                visit_getattr, visit_compare, visit_filter,
