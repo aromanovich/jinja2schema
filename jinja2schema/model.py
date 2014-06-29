@@ -19,12 +19,28 @@ class Variable(object):
         self.may_be_defined = kwargs.pop('may_be_defined', False)
         self.used_with_default = kwargs.pop('used_with_default', False)
 
+    @classmethod
+    def _get_kwargs_from_ast(cls, ast):
+        return {
+            'linenos': [ast.lineno],
+        }
+
+    @classmethod
+    def from_ast(cls, ast):
+        return cls(**cls._get_kwargs_from_ast(ast))
+
     @property
     def required(self):
         return not self.may_be_defined and not self.used_with_default
 
     def __eq__(self, other):
-        return type(self) is type(other)
+        return (
+            type(self) is type(other) and
+            self.constant == other.constant and
+            self.used_with_default == other.used_with_default and
+            self.required == other.required and
+            self.linenos == other.linenos
+        )
 
     def __ne__(self, other):
         return not self.__eq__(other)
@@ -35,8 +51,12 @@ class Dictionary(Variable):
         self.data = data or {}
         super(Dictionary, self).__init__(**kwargs)
 
+    @classmethod
+    def from_ast(cls, ast, data=None):
+        return cls(data, **cls._get_kwargs_from_ast(ast))
+
     def __eq__(self, other):
-        return type(self) is type(other) and self.data == other.data
+        return super(Dictionary, self).__eq__(other) and self.data == other.data
 
     def __setitem__(self, key, value):
         self.data[key] = value
@@ -82,8 +102,12 @@ class List(Variable):
         self.el_struct = el_struct
         super(List, self).__init__(**kwargs)
 
+    @classmethod
+    def from_ast(cls, ast, el_struct):
+        return cls(el_struct, **cls._get_kwargs_from_ast(ast))
+
     def __eq__(self, other):
-        return type(self) is type(other) and self.el_struct == other.el_struct
+        return super(List, self).__eq__(other) and self.el_struct == other.el_struct
 
     def __repr__(self):
         element_repr = _indent(pprint.pformat(self.el_struct), 2)
@@ -96,8 +120,12 @@ class Tuple(Variable):
         self.el_structs = tuple(el_structs) if el_structs is not None else None
         super(Tuple, self).__init__(**kwargs)
 
+    @classmethod
+    def from_ast(cls, ast, el_structs):
+        return cls(el_structs, **cls._get_kwargs_from_ast(ast))
+
     def __eq__(self, other):
-        return type(self) is type(other) and self.el_structs == other.el_structs
+        return super(Tuple, self).__eq__(other) and self.el_structs == other.el_structs
 
     def __repr__(self):
         el_structs_repr = _indent(pprint.pformat(self.el_structs), 2)

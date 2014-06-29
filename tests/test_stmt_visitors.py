@@ -1,9 +1,9 @@
 from jinja2 import nodes
-from jinja2schema.core import (parse, infer, Context, MergeException, visit_assign, visit_if, visit_for)
-from jinja2schema.model import Dictionary, Scalar, List, Unknown, Tuple
 import pytest
 
-from .util import assert_structures_equal
+from jinja2schema.core import (parse, infer, Context, MergeException, UnexpectedExpression,
+                               visit_assign, visit_if, visit_for)
+from jinja2schema.model import Dictionary, Scalar, List, Unknown, Tuple
 
 
 def test_for_1():
@@ -19,7 +19,7 @@ def test_for_1():
             'b': List(Scalar(linenos=[3]), linenos=[2])
         }, linenos=[2]),
     })
-    assert_structures_equal(struct, expected_struct)
+    assert struct == expected_struct
 
 
 def test_for_2():
@@ -39,7 +39,7 @@ def test_for_2():
         'xs': List(Scalar(linenos=[3]), linenos=[2]),
         'ys': List(Unknown(linenos=[4]), linenos=[4]),
     })
-    assert_structures_equal(struct, expected_struct)
+    assert struct == expected_struct
 
 
 def test_for_3():
@@ -60,7 +60,7 @@ def test_for_3():
             Scalar(required=True, linenos=[4])
         ), linenos=[2]), linenos=[2])
     }, required=True, constant=False)
-    assert_structures_equal(struct, expected_struct)
+    assert struct == expected_struct
 
 
 def test_assign_1():
@@ -69,10 +69,10 @@ def test_assign_1():
 
     struct = visit_assign(ast)
     expected_struct = Dictionary({
-        'a': Unknown(constant=True),
+        'a': Unknown(constant=True),   # TODO linenos
         'b': Unknown()
     })
-    assert_structures_equal(struct, expected_struct, check_linenos=False)
+    assert struct == expected_struct
 
 
 def test_assign_2():
@@ -81,15 +81,15 @@ def test_assign_2():
 
     struct = visit_assign(ast)
     expected_struct = Dictionary({
-        'y': Scalar()
+        'y': Scalar(linenos=[1])
     })
-    assert_structures_equal(struct, expected_struct, check_linenos=False)
+    assert struct == expected_struct
 
 
 def test_assign_3():
     template = '''{% set a, b = {'a': 1, 'b': 2} %}'''
     ast = parse(template).find(nodes.Assign)
-    with pytest.raises(MergeException):
+    with pytest.raises(UnexpectedExpression):
         visit_assign(ast)
 
 
@@ -99,13 +99,13 @@ def test_assign_4():
 
     struct = visit_assign(ast)
     expected_struct = Dictionary({
-        'a': Scalar(constant=True),
+        'a': Scalar(linenos=[1], constant=True),
         'b': Dictionary(data={
-            'gsom': Scalar(constant=True),
-        }, constant=True),
-        'z': Scalar(),
+            'gsom': Scalar(linenos=[1], constant=True),
+        }, linenos=[1], constant=True),
+        'z': Scalar(linenos=[1]),
     })
-    assert_structures_equal(struct, expected_struct, check_linenos=False)
+    assert struct == expected_struct
 
 
 def test_assign_5():
@@ -119,13 +119,13 @@ def test_assign_5():
     struct = visit_assign(ast)
     expected_struct = Dictionary({
         'weights': List(Tuple([
-            Scalar(constant=True),
+            Scalar(linenos=[3, 4], constant=True),
             Dictionary({
-                'data': Scalar(constant=True)
-            }, constant=True),
-        ], constant=True), constant=True)
+                'data': Scalar(linenos=[3, 4], constant=True)
+            }, linenos=[3, 4], constant=True),
+        ], linenos=[3, 4], constant=True), linenos=[2], constant=True)
     })
-    assert_structures_equal(struct, expected_struct, check_linenos=False)
+    assert struct == expected_struct
 
 
 def test_assign_6():
@@ -157,7 +157,7 @@ def test_if_1():
         'x': Scalar(linenos=[2, 3]),
         'y': Unknown(linenos=[2]),
     })
-    assert_structures_equal(struct, expected_struct)
+    assert struct == expected_struct
 
 
 def test_if_2():
@@ -169,10 +169,9 @@ def test_if_2():
     {{ x }}
     '''
     struct = infer(parse(template))
-
     expected_struct = Dictionary({
         'x': Scalar(linenos=[2, 4, 6]),
         'y': Unknown(linenos=[2, 4]),
         'z': Unknown(linenos=[2, 4]),
     })
-    assert_structures_equal(struct, expected_struct)
+    assert struct == expected_struct

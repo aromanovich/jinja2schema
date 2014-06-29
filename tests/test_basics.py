@@ -1,8 +1,8 @@
 import pytest
+from jinja2 import nodes
 
-from jinja2schema.core import infer, parse, MergeException
+from jinja2schema.core import infer, parse, MergeException, UnexpectedExpression
 from jinja2schema.model import List, Dictionary, Scalar, Unknown
-from .util import assert_structures_equal
 
 
 def test_may_be_defined():
@@ -24,7 +24,7 @@ def test_may_be_defined():
         'x': Scalar(linenos=[2, 3, 5], constant=False, may_be_defined=True),
         'y': Scalar(linenos=[7, 10, 12], constant=False, may_be_defined=True),
     })
-    assert_structures_equal(struct, expected_struct)
+    assert struct == expected_struct
 
     template = '''
     {{ x }}
@@ -37,7 +37,7 @@ def test_may_be_defined():
     expected_struct = Dictionary({
         'x': Scalar(linenos=[2, 3, 4, 6], constant=False, may_be_defined=False),
     })
-    assert_structures_equal(struct, expected_struct)
+    assert struct == expected_struct
 
 
 def test_basics_1():
@@ -52,7 +52,7 @@ def test_basics_1():
             'qwerty': Unknown(linenos=[2]),
         }, linenos=[2]),
     })
-    assert_structures_equal(struct, expected_struct)
+    assert struct == expected_struct
 
     template = '''
     {% set d = {'x': 123, a: z.qwerty} %}
@@ -100,7 +100,7 @@ def test_basics_2():
             'gsom': Scalar(linenos=[6, 12]),
         }, linenos=[4, 6, 12]),
     })
-    assert_structures_equal(struct, expected_struct)
+    assert struct == expected_struct
 
 
 def test_basics_3():
@@ -202,15 +202,24 @@ def test_basics_7():
     assert_structures_equal(struct, expected_struct, check_linenos=False)
 
 
-
 def test_basics_8():
     template = '''
     {% for row in items|batch(3, '&nbsp;')|batch(1) %}
         {{ row[1].name }}
     {% endfor %}
     '''
-    with pytest.raises(MergeException):
+    with pytest.raises(UnexpectedExpression) as excinfo:
         infer(parse(template))
+    e = excinfo.value
+
+    assert isinstance(e.actual_ast, nodes.Filter)
+    assert e.expected_struct == List(
+        Dictionary({
+            'name': Scalar(required=True, constant=False, linenos=[3])
+        }, required=True, constant=False, linenos=[3]),
+        required=True, constant=False, linenos=[2, 3]
+    )
+    assert e.actual_struct == List(List(Unknown()))
 
 
 def test_basics_9():
@@ -220,9 +229,9 @@ def test_basics_9():
     '''
     struct = infer(parse(template))
     expected_struct = Dictionary({
-        'items': List(Unknown()),  # TODO it should be Scalar
+        'items': List(Unknown(), linenos=[2]),  # TODO it should be Scalar
     })
-    assert_structures_equal(struct, expected_struct, check_linenos=False)
+    assert struct == expected_struct
 
 
 def test_basics_10():
@@ -233,10 +242,9 @@ def test_basics_10():
     '''
     struct = infer(parse(template))
     expected_struct = Dictionary({
-        'data': Dictionary({
-        }),
+        'data': Dictionary({}, linenos=[2]),
     })
-    assert_structures_equal(struct, expected_struct, check_linenos=False)
+    assert struct == expected_struct
 
 
 def test_basics_11():
@@ -252,15 +260,16 @@ def test_basics_11():
     struct = infer(parse(template))
     expected_struct = Dictionary({
         'a': Dictionary({
-            'attr1': List(Scalar()),
-            'attr2': List(Scalar(), used_with_default=True),
-            'attr3': Scalar(used_with_default=True)
-        }),
+            'attr1': List(Scalar(), linenos=[3]),
+            'attr2': List(Scalar(linenos=[4]), linenos=[4], used_with_default=True),
+            'attr3': Scalar(linenos=[5], used_with_default=True)
+        }, linenos=[2, 3, 4, 5]),
         'xs': List(
-            Scalar()  # TODO it should be Dictionary({'is_active': Unknown()})
+            Scalar(linenos=[7]),  # TODO it should be Dictionary({'is_active': Unknown()})
+            linenos=[6]
         ),
     })
-    assert_structures_equal(struct, expected_struct, check_linenos=False)
+    assert struct == expected_struct
 
 
 def test_basics_12():
@@ -272,10 +281,9 @@ def test_basics_12():
     '''
     struct = infer(parse(template))
     expected_struct = Dictionary({
-        'data': Dictionary({
-        }),
+        'data': Dictionary({}, linenos=[2]),
     })
-    assert_structures_equal(struct, expected_struct, check_linenos=False)
+    assert struct == expected_struct
 
 
 def test_basics_13():  # test dictsort
@@ -285,7 +293,7 @@ def test_basics_13():  # test dictsort
         {{ v }}
     {% endfor %}
     '''
-    with pytest.raises(MergeException):
+    with pytest.raises(UnexpectedExpression):
         infer(parse(template))
 
 
@@ -297,7 +305,7 @@ def test_raw_1():
     '''
     struct = infer(parse(template))
     expected_struct = Dictionary()
-    assert_structures_equal(struct, expected_struct)
+    assert struct == expected_struct
 
 
 def test_call_range():
@@ -308,9 +316,9 @@ def test_call_range():
     '''
     struct = infer(parse(template))
     expected_struct = Dictionary({
-        'users': List(Unknown()),
+        'users': List(Unknown(), linenos=[2]),
     })
-    assert_structures_equal(struct, expected_struct)
+    assert struct == expected_struct
 
     template = '''
     {% for number in range(10 - users|length) %}
@@ -321,7 +329,7 @@ def test_call_range():
         infer(parse(template))
 
     template = '{{ range(10 - users|length) }}'
-    with pytest.raises(MergeException):
+    with pytest.raises(UnexpectedExpression):
         infer(parse(template))
 
 
@@ -332,18 +340,18 @@ def test_call_lipsum():
     struct = infer(parse(template))
     expected_struct = Dictionary({
         'a': Dictionary({
-            'field': Scalar(),
-        }),
+            'field': Scalar(linenos=[2]),
+        }, linenos=[2]),
     })
-    assert_structures_equal(struct, expected_struct, check_linenos=False)
+    assert struct == expected_struct
 
     template = '''
     {% for number in lipsum(n=10) %}
     {% endfor %}
     '''
-    with pytest.raises(MergeException):
+    with pytest.raises(UnexpectedExpression):
         infer(parse(template))
 
     template = '{{ lipsum(n=10).field }}'
-    with pytest.raises(MergeException):
+    with pytest.raises(UnexpectedExpression):
         infer(parse(template))
