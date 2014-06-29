@@ -26,8 +26,9 @@ class Variable(object):
         }
 
     @classmethod
-    def from_ast(cls, ast):
-        return cls(**cls._get_kwargs_from_ast(ast))
+    def from_ast(cls, ast, **kwargs):
+        kwargs.update(cls._get_kwargs_from_ast(ast))
+        return cls(**kwargs)
 
     @property
     def required(self):
@@ -52,8 +53,9 @@ class Dictionary(Variable):
         super(Dictionary, self).__init__(**kwargs)
 
     @classmethod
-    def from_ast(cls, ast, data=None):
-        return cls(data, **cls._get_kwargs_from_ast(ast))
+    def from_ast(cls, ast, data=None, **kwargs):
+        kwargs.update(cls._get_kwargs_from_ast(ast))
+        return cls(data, **kwargs)
 
     def __eq__(self, other):
         return super(Dictionary, self).__eq__(other) and self.data == other.data
@@ -103,8 +105,9 @@ class List(Variable):
         super(List, self).__init__(**kwargs)
 
     @classmethod
-    def from_ast(cls, ast, el_struct):
-        return cls(el_struct, **cls._get_kwargs_from_ast(ast))
+    def from_ast(cls, ast, el_struct, **kwargs):
+        kwargs.update(cls._get_kwargs_from_ast(ast))
+        return cls(el_struct, **kwargs)
 
     def __eq__(self, other):
         return super(List, self).__eq__(other) and self.el_struct == other.el_struct
@@ -121,8 +124,9 @@ class Tuple(Variable):
         super(Tuple, self).__init__(**kwargs)
 
     @classmethod
-    def from_ast(cls, ast, el_structs):
-        return cls(el_structs, **cls._get_kwargs_from_ast(ast))
+    def from_ast(cls, ast, el_structs, **kwargs):
+        kwargs.update(cls._get_kwargs_from_ast(ast))
+        return cls(el_structs, **kwargs)
 
     def __eq__(self, other):
         return super(Tuple, self).__eq__(other) and self.el_structs == other.el_structs

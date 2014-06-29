@@ -20,9 +20,6 @@ class Context(object):
         self.return_struct = return_struct if return_struct is not None else Unknown()
         self.predicted_struct = predicted_struct
 
-    def get_current_rtype(self, ast):
-        return self.return_struct
-
     def get_predicted_struct(self, ast):
         return self.predicted_struct
 
@@ -192,10 +189,10 @@ def visit_getattr(ast, ctx):
 def visit_test(ast, ctx):
     if ast.name in ('divisibleby', 'escaped', 'even', 'lower', 'odd', 'upper'):
         ctx.meet(Scalar(), ast)
-        predicted_struct = Scalar(linenos=[ast.lineno])
+        predicted_struct = Scalar.from_ast(ast)
     elif ast.name in ('defined', 'undefined', 'equalto', 'iterable', 'mapping',
                       'none', 'number', 'sameas', 'sequence', 'string'):
-        predicted_struct = Unknown(linenos=[ast.lineno])
+        predicted_struct = Unknown.from_ast(ast)
     else:
         raise UnsupportedSyntax(ast, 'unknown test "{}"'.format(ast.name))
     rtype, struct = visit_expr(ast.node, Context(return_struct=Scalar(), predicted_struct=predicted_struct))
@@ -203,14 +200,14 @@ def visit_test(ast, ctx):
         if not ast.args:
             raise UnsupportedSyntax(ast, 'divisibleby must have an argument')
         _, arg_struct = visit_expr(ast.args[0],
-                                   Context(predicted_struct=Scalar(linenos=[ast.lineno])))
+                                   Context(predicted_struct=Scalar.from_ast(ast)))
         struct = merge(arg_struct, struct)
     return rtype, struct
 
 
 @visits_expr(nodes.Name)
 def visit_name(ast, ctx):
-    return ctx.get_current_rtype(ast), Dictionary({
+    return ctx.return_struct, Dictionary({
         ast.name: ctx.get_predicted_struct(ast)
     })
 
@@ -298,7 +295,7 @@ def visit_filter(ast, ctx):
         else:
             ctx.meet(Scalar(), ast)
             el_struct = Scalar()
-        node_struct = List(el_struct, linenos=[ast.node.lineno])
+        node_struct = List.from_ast(ast.node, el_struct)
     elif ast.name in ('groupby', 'map', 'reject', 'rejectattr', 'select', 'selectattr', 'sort'):
         ctx.meet(List(Unknown()), ast)
         node_struct = merge(
@@ -338,7 +335,7 @@ def visit_template_data(ast, ctx):
 @visits_expr(nodes.Const)
 def visit_const(ast, ctx):
     ctx.meet(Scalar(), ast)
-    return Scalar(linenos=[ast.lineno], constant=True), Dictionary()
+    return Scalar.from_ast(ast, constant=True), Dictionary()
 
 
 @visits_expr(nodes.Tuple)
@@ -351,7 +348,7 @@ def visit_tuple(ast, ctx):
         item_rtype, item_struct = visit_expr(item, ctx)
         item_structs.append(item_rtype)
         struct = merge(struct, item_struct)
-    rtype = Tuple(item_structs, linenos=[ast.lineno], constant=True)
+    rtype = Tuple.from_ast(ast, item_structs, constant=True)
     return rtype, struct
 
 
@@ -369,7 +366,7 @@ def visit_list(ast, ctx):
             el_rtype = item_rtype
         else:
             el_rtype = merge_rtypes(el_rtype, item_rtype)
-    rtype = List(el_rtype or Unknown(), linenos=[ast.lineno], constant=True)
+    rtype = List.from_ast(ast, el_rtype or Unknown(), constant=True)
     return rtype, struct
 
 
@@ -380,14 +377,14 @@ def _visit_dict(ast, ctx, items):
     :param items: a list of (key, value); key may be either ast or string
     """
     ctx.meet(Dictionary(), ast)
-    rtype = Dictionary(linenos=[ast.lineno], constant=True)
+    rtype = Dictionary.from_ast(ast, constant=True)
     struct = Dictionary()
     for key, value in items:
         value_rtype, value_struct = visit_expr(value, Context(
-            predicted_struct=Unknown(linenos=[value.lineno])))
+            predicted_struct=Unknown.from_ast(value)))
         struct = merge(struct, value_struct)
         if isinstance(key, nodes.Node):
-            key_rtype, key_struct = visit_expr(key, Context(predicted_struct=Scalar(linenos=[key.lineno])))
+            key_rtype, key_struct = visit_expr(key, Context(predicted_struct=Scalar.from_ast(key)))
             struct = merge(struct, key_struct)
             if isinstance(key, nodes.Const):
                 rtype[key.value] = value_rtype
@@ -414,17 +411,18 @@ def visit_for(ast):
         del body_struct['loop']
 
     if isinstance(ast.target, nodes.Tuple):
-        target_struct = Tuple([body_struct.pop(item.name, Unknown(linenos=[ast.target.lineno]))
-                               for item in ast.target.items],
-                              linenos=[ast.target.lineno])
+        target_struct = Tuple.from_ast(
+            ast.target,
+            [body_struct.pop(item.name, Unknown.from_ast(ast.target))
+             for item in ast.target.items])
     else:
-        target_struct = body_struct.pop(ast.target.name, Unknown(linenos=[ast.target.lineno]))
+        target_struct = body_struct.pop(ast.target.name, Unknown.from_ast(ast))
 
     iter_rtype, iter_struct = visit_expr(
         ast.iter,
         Context(
             return_struct=Unknown(),
-            predicted_struct=List(target_struct, linenos=[ast.lineno])))
+            predicted_struct=List.from_ast(ast, target_struct)))
 
     merge(iter_rtype, List(target_struct))
 
@@ -434,7 +432,8 @@ def visit_for(ast):
 @visits_stmt(nodes.If)
 def visit_if(ast):
     test_rtype, test_struct = visit_expr(ast.test, Context(
-        return_struct=Unknown(), predicted_struct=Unknown(linenos=[ast.test.lineno])))
+        return_struct=Unknown(),
+        predicted_struct=Unknown.from_ast(ast.test)))
     if_struct = visit_nodes_and_merge(ast.body, Scalar)
     else_struct = visit_nodes_and_merge(ast.else_, Scalar) if ast.else_ else Dictionary()
     struct = merge(merge(test_struct, if_struct), else_struct)
@@ -476,7 +475,7 @@ def visit_assign(ast):
     elif isinstance(ast.target, nodes.Tuple):
         tuple_items = []
         for name_ast in ast.target.items:
-            var_struct = Unknown(lineno=[name_ast.lineno], constant=True)
+            var_struct = Unknown.from_ast(name_ast, constant=True)
             tuple_items.append(var_struct)
             struct = merge(struct, Dictionary({name_ast.name: var_struct}))
         var_rtype, var_struct = visit_expr(
@@ -499,8 +498,9 @@ def visit_template(ast):
 def visit_nodes_and_merge(nodes, predicted_struct_class):
     rv = Dictionary()
     for node in nodes:
-        rv = merge(rv, visit(node, Context(return_struct=Scalar(),
-                                           predicted_struct=predicted_struct_class(linenos=[node.lineno]))))
+        rv = merge(rv, visit(node, Context(
+            return_struct=Scalar(),
+            predicted_struct=predicted_struct_class.from_ast(node))))
     return rv
 
 
