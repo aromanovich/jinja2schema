@@ -20,7 +20,7 @@ class Context(object):
         self.return_struct_cls = return_struct_cls if return_struct_cls is not None else Unknown
         self.predicted_struct = predicted_struct if predicted_struct is not None else Unknown()
 
-    def get_predicted_struct(self, ast, label=None):
+    def get_predicted_struct(self, label=None):
         rv = self.predicted_struct.clone()
         if label:
             rv.label = label
@@ -162,7 +162,7 @@ def visit_slice(ast, ctx):
 @visits_expr(nodes.Name)
 def visit_name(ast, ctx):
     return ctx.return_struct_cls.from_ast(ast), Dictionary({
-        ast.name: ctx.get_predicted_struct(ast, label=ast.name)
+        ast.name: ctx.get_predicted_struct(label=ast.name)
     })
 
 
@@ -171,27 +171,26 @@ def visit_getattr(ast, ctx):
     context = Context(
         return_struct_cls=ctx.return_struct_cls,
         predicted_struct=Dictionary.from_ast(ast, {
-            ast.attr: ctx.get_predicted_struct(ast, label=ast.attr),
+            ast.attr: ctx.get_predicted_struct(label=ast.attr),
         }))
     return visit_expr(ast.node, context)
 
 
 @visits_expr(nodes.Getitem)
 def visit_getitem(ast, ctx):
-    predicted_struct = ctx.get_predicted_struct(ast)
     arg = ast.arg
     if isinstance(arg, nodes.Const):
         if isinstance(arg.value, int):
-            predicted_struct = List.from_ast(arg, predicted_struct)
+            predicted_struct = List.from_ast(arg, ctx.get_predicted_struct())
         elif isinstance(arg.value, basestring):
             predicted_struct = Dictionary.from_ast(arg, {
-                arg.value: ctx.get_predicted_struct(ast, label=arg.value),
+                arg.value: ctx.get_predicted_struct(label=arg.value),
             })
         else:
             raise UnsupportedSyntax(arg, '{} is not supported as an index for a list or'
                                          ' a key for a dictionary'.format(arg.value))
     else:
-        predicted_struct = List.from_ast(arg, predicted_struct)
+        predicted_struct = List.from_ast(arg, ctx.get_predicted_struct())
 
     _, arg_struct = visit_expr(arg, Context(predicted_struct=Scalar.from_ast(arg)))
     rtype, struct = visit_expr(ast.node, Context(
@@ -281,13 +280,13 @@ def visit_filter(ast, ctx):
         ctx.meet(List(List(Unknown())), ast)
         node_struct = merge(
             List(List(Unknown(), linenos=[ast.node.lineno]), linenos=[ast.node.lineno]),
-            ctx.get_predicted_struct(ast)
+            ctx.get_predicted_struct()
         ).el_struct
     elif ast.name == 'default':
         default_value_rtype, default_value_struct = visit_expr(
             ast.args[0], Context(predicted_struct=Unknown.from_ast(ast.args[0])))
         node_struct = merge(
-            ctx.get_predicted_struct(ast),
+            ctx.get_predicted_struct(),
             default_value_rtype,
         )
         node_struct.used_with_default = True
@@ -305,7 +304,7 @@ def visit_filter(ast, ctx):
         return rtype, merge(struct, arg_struct)
     elif ast.name in ('first', 'last', 'random', 'length', 'sum'):
         if ast.name in ('first', 'last', 'random'):
-            el_struct = ctx.get_predicted_struct(ast)
+            el_struct = ctx.get_predicted_struct()
         elif ast.name == 'length':
             ctx.meet(Scalar(), ast)
             el_struct = Unknown()
@@ -317,17 +316,17 @@ def visit_filter(ast, ctx):
         ctx.meet(List(Unknown()), ast)
         node_struct = merge(
             List(Unknown()),
-            ctx.get_predicted_struct(ast)
+            ctx.get_predicted_struct()
         )
     elif ast.name == 'list':
         ctx.meet(List(Scalar()), ast)
         node_struct = merge(
             List(Scalar.from_ast(ast.node)),
-            ctx.get_predicted_struct(ast)
+            ctx.get_predicted_struct()
         ).el_struct
     elif ast.name == 'pprint':
         ctx.meet(Scalar(), ast)
-        node_struct = ctx.get_predicted_struct(ast)
+        node_struct = ctx.get_predicted_struct()
     elif ast.name == 'xmlattr':
         ctx.meet(Scalar(), ast)
         node_struct = Dictionary.from_ast(ast.node)
@@ -374,7 +373,7 @@ def visit_list(ast, ctx):
     ctx.meet(List(Unknown()), ast)
     struct = Dictionary()
 
-    predicted_struct = merge(List(Unknown()), ctx.get_predicted_struct(ast)).el_struct
+    predicted_struct = merge(List(Unknown()), ctx.get_predicted_struct()).el_struct
     el_rtype = None
     for item in ast.items:
         item_rtype, item_struct = visit_expr(item, Context(predicted_struct=predicted_struct))
