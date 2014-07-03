@@ -1,7 +1,7 @@
 from jinja2 import nodes
 import pytest
 
-from jinja2schema.core import (parse, infer, Context, MergeException, UnexpectedExpression,
+from jinja2schema.core import (parse, infer, MergeException, UnexpectedExpression,
                                visit_assign, visit_if, visit_for)
 from jinja2schema.model import Dictionary, Scalar, List, Unknown, Tuple
 
@@ -59,7 +59,7 @@ def test_for_3():
             }, label='a', linenos=[3]),
             Scalar(label='b', linenos=[4])
         ), linenos=[2]), label='list', linenos=[2])
-    }, constant=False)
+    })
     assert struct == expected_struct
 
 

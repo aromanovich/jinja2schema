@@ -3,29 +3,44 @@ import pprint
 from jinja2 import nodes
 
 
-def _compare_labels(a, b):
-    return a == b
-
-
 def _indent(s, spaces_num):
     lines = s.split('\n')
     return '\n'.join([spaces_num * ' ' + line for line in lines])
 
 
 class Variable(object):
-    """Base structure class.
+    """A base variable class.
 
     .. attribute:: linenos
 
-        A list of line numbers on which the variable occurs.
+        An ordered list of line numbers on which the variable occurs.
+
+    .. attribute:: label
+
+        A name of the variable in template.
+
+    .. attribute: constant
+
+        Is true if the variable is defined by a {% set %} tag before used in the template.
+
+    .. attribute: may_be_defined
+
+        Is true if the variable would be defined by a {% set %} tag if it is undefined.
+        For example, ``x`` is ``may_be_defined`` in the following template::
+
+            {% if x is undefined %} {% set x = 1 %} {% endif %}
+
+    .. attribute: used_with_default
+
+        Is true if the variable occurs _only_ within the ``default`` filter.
     """
-    def __init__(self, linenos=None, constant=False,
-                 may_be_defined=False, used_with_default=False, label=None):
+    def __init__(self, label=None, linenos=None, constant=False,
+                 may_be_defined=False, used_with_default=False):
+        self.label = label
         self.linenos = linenos if linenos is not None else []
         self.constant = constant
         self.may_be_defined = may_be_defined
         self.used_with_default = used_with_default
-        self.label = label
 
     def clone(self):
         cls = type(self)
@@ -62,11 +77,17 @@ class Variable(object):
             self.used_with_default == other.used_with_default and
             self.required == other.required and
             self.linenos == other.linenos and
-            _compare_labels(self.label, other.label)
+            self.label == other.label
         )
 
     def __ne__(self, other):
         return not self.__eq__(other)
+
+    def to_json_schema(self):
+        rv = {}
+        if self.label:
+            rv['title'] = self.label
+        return rv
 
 
 class Dictionary(Variable):
@@ -127,6 +148,15 @@ class Dictionary(Variable):
         return u'Dictionary({0.label}, r={0.required}, c={0.constant}, ls={0.linenos}, \n{1}\n)'.format(
             self, data_repr).encode('utf-8')
 
+    def to_json_schema(self):
+        rv = super(Dictionary, self).to_json_schema()
+        rv.update({
+            'type': 'object',
+            'properties': dict((k, v.to_json_schema()) for k, v in self.data.iteritems()),
+            'required': [k for k, v in self.data.iteritems() if v.required],
+        })
+        return rv
+
 
 class List(Variable):
     def __init__(self, el_struct, **kwargs):
@@ -150,6 +180,14 @@ class List(Variable):
         element_repr = _indent(pprint.pformat(self.el_struct), 2)
         return u'List({0.label}, r={0.required}, c={0.constant}, ls={0.linenos}, \n{1}\n)'.format(
             self, element_repr).encode('utf-8')
+
+    def to_json_schema(self):
+        rv = super(List, self).to_json_schema()
+        rv.update({
+            'type': 'array',
+            'items': self.el_struct.to_json_schema(),
+        })
+        return rv
 
 
 class Tuple(Variable):
@@ -175,14 +213,48 @@ class Tuple(Variable):
         return u'Tuple({0.label}, r={0.required}, c={0.constant}, ls={0.linenos} \n{1}\n)'.format(
             self, el_structs_repr).encode('utf-8')
 
+    def to_json_schema(self):
+        rv = super(Tuple, self).to_json_schema()
+        rv.update({
+            'type': 'array',
+            'items': [el_struct.to_json_schema() for el_struct in self.el_structs],
+        })
+        return rv
+
 
 class Scalar(Variable):
     def __repr__(self):
         return (u'Scalar({0.label}, r={0.required}, c={0.constant}, '
                 u'ls={0.linenos})').format(self).encode('utf-8')
 
+    def to_json_schema(self):
+        rv = super(Scalar, self).to_json_schema()
+        rv.update({
+            'anyOf':  [
+                {'type': 'string'},
+                {'type': 'number'},
+                {'type': 'boolean'},
+                {'type': 'null'},
+            ],
+        })
+        return rv
+
 
 class Unknown(Variable):
     def __repr__(self):
         return (u'Unknown({0.label}, r={0.required}, c={0.constant}, '
                 u'ls={0.linenos})'.format(self).encode('utf-8'))
+
+    def to_json_schema(self):
+        rv = super(Unknown, self).to_json_schema()
+        rv.update({
+            'anyOf':  [
+                {'type': 'object'},
+                {'type': 'array'},
+                {'type': 'string'},
+                {'type': 'number'},
+                {'type': 'boolean'},
+                {'type': 'null'},
+            ],
+        })
+        return rv
