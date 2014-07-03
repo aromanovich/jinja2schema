@@ -16,12 +16,15 @@ from .model import Scalar, Dictionary, List, Unknown, Tuple
 
 
 class Context(object):
-    def __init__(self, return_struct=None, predicted_struct=None):
-        self.return_struct = return_struct if return_struct is not None else Unknown()
-        self.predicted_struct = predicted_struct
+    def __init__(self, return_struct_cls=None, predicted_struct=None):
+        self.return_struct_cls = return_struct_cls if return_struct_cls is not None else Unknown
+        self.predicted_struct = predicted_struct if predicted_struct is not None else Unknown()
 
-    def get_predicted_struct(self, ast):
-        return self.predicted_struct
+    def get_predicted_struct(self, ast, label=None):
+        rv = self.predicted_struct.clone()
+        if label:
+            rv.label = label
+        return rv
 
     def meet(self, actual_struct, actual_ast):
         try:
@@ -86,6 +89,7 @@ def merge(fst, snd):
             result = Tuple([merge(a, b) for a, b in zip(fst.el_structs, snd.el_structs)])
     else:
         raise MergeException(fst, snd)
+    result.label = fst.label or snd.label
     result.linenos = list(sorted(set(fst.linenos + snd.linenos)))
     result.constant = fst.constant
     result.may_be_defined = fst.may_be_defined
@@ -95,9 +99,10 @@ def merge(fst, snd):
 
 def merge_rtypes(fst, snd, operator=None):
     if operator == '+':
-        if type(fst) is not type(snd):
+        if type(fst) is not type(snd) and not (isinstance(fst, Unknown) or isinstance(snd, Unknown)):
             raise MergeException(fst, snd)
-    return merge(fst, snd)
+    rv = merge(fst, snd)
+    return rv
 
 
 stmt_visitors = {}
@@ -154,6 +159,23 @@ def visit_slice(ast, ctx):
     return Unknown(), visit_nodes_and_merge(nodes, Scalar)
 
 
+@visits_expr(nodes.Name)
+def visit_name(ast, ctx):
+    return ctx.return_struct_cls.from_ast(ast), Dictionary({
+        ast.name: ctx.get_predicted_struct(ast, label=ast.name)
+    })
+
+
+@visits_expr(nodes.Getattr)
+def visit_getattr(ast, ctx):
+    context = Context(
+        return_struct_cls=ctx.return_struct_cls,
+        predicted_struct=Dictionary.from_ast(ast, {
+            ast.attr: ctx.get_predicted_struct(ast, label=ast.attr),
+        }))
+    return visit_expr(ast.node, context)
+
+
 @visits_expr(nodes.Getitem)
 def visit_getitem(ast, ctx):
     predicted_struct = ctx.get_predicted_struct(ast)
@@ -162,7 +184,9 @@ def visit_getitem(ast, ctx):
         if isinstance(arg.value, int):
             predicted_struct = List.from_ast(arg, predicted_struct)
         elif isinstance(arg.value, basestring):
-            predicted_struct = Dictionary.from_ast(arg, {arg.value: predicted_struct})
+            predicted_struct = Dictionary.from_ast(arg, {
+                arg.value: ctx.get_predicted_struct(ast, label=arg.value),
+            })
         else:
             raise UnsupportedSyntax(arg, '{} is not supported as an index for a list or'
                                          ' a key for a dictionary'.format(arg.value))
@@ -171,56 +195,40 @@ def visit_getitem(ast, ctx):
 
     _, arg_struct = visit_expr(arg, Context(predicted_struct=Scalar.from_ast(arg)))
     rtype, struct = visit_expr(ast.node, Context(
-        return_struct=ctx.return_struct, predicted_struct=predicted_struct))
+        return_struct_cls=ctx.return_struct_cls,
+        predicted_struct=predicted_struct))
     return rtype, merge(struct, arg_struct)
-
-
-@visits_expr(nodes.Getattr)
-def visit_getattr(ast, ctx):
-    context = Context(
-        return_struct=ctx.return_struct,
-        predicted_struct=Dictionary.from_ast(ast, {
-            ast.attr: ctx.get_predicted_struct(ast),
-        }))
-    return visit_expr(ast.node, context)
 
 
 @visits_expr(nodes.Test)
 def visit_test(ast, ctx):
     if ast.name in ('divisibleby', 'escaped', 'even', 'lower', 'odd', 'upper'):
         ctx.meet(Scalar(), ast)
-        predicted_struct = Scalar.from_ast(ast)
+        predicted_struct = Scalar.from_ast(ast.node)
     elif ast.name in ('defined', 'undefined', 'equalto', 'iterable', 'mapping',
                       'none', 'number', 'sameas', 'sequence', 'string'):
-        predicted_struct = Unknown.from_ast(ast)
+        predicted_struct = Unknown.from_ast(ast.node)
     else:
         raise UnsupportedSyntax(ast, 'unknown test "{}"'.format(ast.name))
-    rtype, struct = visit_expr(ast.node, Context(return_struct=Scalar(), predicted_struct=predicted_struct))
+    rtype, struct = visit_expr(ast.node, Context(return_struct_cls=Scalar, predicted_struct=predicted_struct))
     if ast.name == 'divisibleby':
         if not ast.args:
             raise UnsupportedSyntax(ast, 'divisibleby must have an argument')
         _, arg_struct = visit_expr(ast.args[0],
-                                   Context(predicted_struct=Scalar.from_ast(ast)))
+                                   Context(predicted_struct=Scalar.from_ast(ast.args[0])))
         struct = merge(arg_struct, struct)
     return rtype, struct
-
-
-@visits_expr(nodes.Name)
-def visit_name(ast, ctx):
-    return ctx.return_struct, Dictionary({
-        ast.name: ctx.get_predicted_struct(ast)
-    })
 
 
 @visits_expr(nodes.Concat)
 def visit_concat(ast, ctx):
     ctx.meet(Scalar(), ast)
-    return Scalar(), visit_nodes_and_merge(ast.nodes, Scalar)
+    return Scalar.from_ast(ast), visit_nodes_and_merge(ast.nodes, Scalar)
 
 
 @visits_expr(nodes.CondExpr)
 def visit_cond_expr(ast, ctx):
-    test_rtype, test_struct = visit_expr(ast.test, Context(predicted_struct=Unknown()))
+    test_rtype, test_struct = visit_expr(ast.test, Context(predicted_struct=Unknown.from_ast(ast.test)))
     if_rtype, if_struct = visit_expr(ast.expr1, ctx)
     else_rtype, else_struct = visit_expr(ast.expr2, ctx)
     struct = merge(merge(if_struct, test_struct), else_struct)
@@ -286,7 +294,16 @@ def visit_filter(ast, ctx):
     elif ast.name == 'dictsort':
         ctx.meet(List(Tuple([Scalar(), Unknown()])), ast)
         node_struct = Dictionary.from_ast(ast.node)
-    elif ast.name in ('first', 'last', 'random', 'length', 'join', 'sum'):
+    elif ast.name == 'join':
+        ctx.meet(Scalar(), ast)
+        node_struct = List.from_ast(ast.node, Scalar())
+        rtype, struct = visit_expr(ast.node, Context(
+            return_struct_cls=ctx.return_struct_cls,
+            predicted_struct=node_struct
+        ))
+        arg_rtype, arg_struct = visit_expr(ast.args[0], Context(predicted_struct=Scalar.from_ast(ast.args[0])))
+        return rtype, merge(struct, arg_struct)
+    elif ast.name in ('first', 'last', 'random', 'length', 'sum'):
         if ast.name in ('first', 'last', 'random'):
             el_struct = ctx.get_predicted_struct(ast)
         elif ast.name == 'length':
@@ -320,7 +337,7 @@ def visit_filter(ast, ctx):
         raise UnsupportedSyntax(ast, 'unknown filter')
 
     return visit_expr(ast.node, Context(
-        return_struct=ctx.return_struct,
+        return_struct_cls=ctx.return_struct_cls,
         predicted_struct=node_struct
     ))
 
@@ -421,7 +438,7 @@ def visit_for(ast):
     iter_rtype, iter_struct = visit_expr(
         ast.iter,
         Context(
-            return_struct=Unknown(),
+            return_struct_cls=Unknown,
             predicted_struct=List.from_ast(ast, target_struct)))
 
     merge(iter_rtype, List(target_struct))
@@ -432,7 +449,7 @@ def visit_for(ast):
 @visits_stmt(nodes.If)
 def visit_if(ast):
     test_rtype, test_struct = visit_expr(ast.test, Context(
-        return_struct=Unknown(),
+        return_struct_cls=Unknown,
         predicted_struct=Unknown.from_ast(ast.test)))
     if_struct = visit_nodes_and_merge(ast.body, Scalar)
     else_struct = visit_nodes_and_merge(ast.else_, Scalar) if ast.else_ else Dictionary()
@@ -455,7 +472,6 @@ def visit_assign(ast):
     struct = Dictionary()
     if (isinstance(ast.target, nodes.Name) or
             (isinstance(ast.target, nodes.Tuple) and isinstance(ast.node, nodes.Tuple))):
-        context = Context(return_struct=Unknown(), predicted_struct=Unknown())
         variables = []
         if not (isinstance(ast.target, nodes.Tuple) and isinstance(ast.node, nodes.Tuple)):
             variables.append((ast.target.name, ast.node))
@@ -466,8 +482,9 @@ def visit_assign(ast):
             for name_ast, var_ast in itertools.izip(ast.target.items, ast.node.items):
                 variables.append((name_ast.name, var_ast))
         for var_name, var_ast in variables:
-            var_rtype, var_struct = visit_expr(var_ast, context)
+            var_rtype, var_struct = visit_expr(var_ast, Context(predicted_struct=Unknown.from_ast(var_ast)))
             var_rtype.constant = True
+            var_rtype.label = var_name
             struct = merge(merge(struct, var_struct), Dictionary({
                 var_name: var_rtype,
             }))
@@ -479,7 +496,7 @@ def visit_assign(ast):
             tuple_items.append(var_struct)
             struct = merge(struct, Dictionary({name_ast.name: var_struct}))
         var_rtype, var_struct = visit_expr(
-            ast.node, Context(return_struct=Unknown(), predicted_struct=Tuple(tuple_items)))
+            ast.node, Context(return_struct_cls=Unknown, predicted_struct=Tuple(tuple_items)))
         return merge(struct, var_struct)
     else:
         raise UnsupportedSyntax(ast, 'unsupported assignment')
@@ -499,7 +516,7 @@ def visit_nodes_and_merge(nodes, predicted_struct_class):
     rv = Dictionary()
     for node in nodes:
         rv = merge(rv, visit(node, Context(
-            return_struct=Scalar(),
+            return_struct_cls=Scalar,
             predicted_struct=predicted_struct_class.from_ast(node))))
     return rv
 

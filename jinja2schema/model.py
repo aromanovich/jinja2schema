@@ -1,5 +1,11 @@
 import pprint
 
+from jinja2 import nodes
+
+
+def _compare_labels(a, b):
+    return a == b
+
 
 def _indent(s, spaces_num):
     lines = s.split('\n')
@@ -13,21 +19,36 @@ class Variable(object):
 
         A list of line numbers on which the variable occurs.
     """
-    def __init__(self, **kwargs):
-        self.linenos = kwargs.pop('linenos', [])
-        self.constant = kwargs.pop('constant', False)
-        self.may_be_defined = kwargs.pop('may_be_defined', False)
-        self.used_with_default = kwargs.pop('used_with_default', False)
+    def __init__(self, linenos=None, constant=False,
+                 may_be_defined=False, used_with_default=False, label=None):
+        self.linenos = linenos if linenos is not None else []
+        self.constant = constant
+        self.may_be_defined = may_be_defined
+        self.used_with_default = used_with_default
+        self.label = label
+
+    def clone(self):
+        cls = type(self)
+        return cls(**self.__dict__)
 
     @classmethod
     def _get_kwargs_from_ast(cls, ast):
-        return {
+        if isinstance(ast, nodes.Name):
+            label = ast.name
+        else:
+            label = None
+        rv = {
             'linenos': [ast.lineno],
+            'label': label,
         }
+        return rv
 
     @classmethod
     def from_ast(cls, ast, **kwargs):
-        kwargs.update(cls._get_kwargs_from_ast(ast))
+        for k, v in kwargs.items():
+            if v is None:
+                del kwargs[k]
+        kwargs = dict(cls._get_kwargs_from_ast(ast), **kwargs)
         return cls(**kwargs)
 
     @property
@@ -40,7 +61,8 @@ class Variable(object):
             self.constant == other.constant and
             self.used_with_default == other.used_with_default and
             self.required == other.required and
-            self.linenos == other.linenos
+            self.linenos == other.linenos and
+            _compare_labels(self.label, other.label)
         )
 
     def __ne__(self, other):
@@ -52,9 +74,16 @@ class Dictionary(Variable):
         self.data = data or {}
         super(Dictionary, self).__init__(**kwargs)
 
+    def clone(self):
+        rv = super(Dictionary, self).clone()
+        rv.data = {}
+        for k, v in self.data.iteritems():
+            rv.data[k] = v.clone()
+        return rv
+
     @classmethod
     def from_ast(cls, ast, data=None, **kwargs):
-        kwargs.update(cls._get_kwargs_from_ast(ast))
+        kwargs = dict(cls._get_kwargs_from_ast(ast), **kwargs)
         return cls(data, **kwargs)
 
     def __eq__(self, other):
@@ -95,7 +124,7 @@ class Dictionary(Variable):
 
     def __repr__(self):
         data_repr = _indent(pprint.pformat(self.data), 2)
-        return u'Dictionary(r={0.required}, c={0.constant}, ls={0.linenos}, \n{1}\n)'.format(
+        return u'Dictionary({0.label}, r={0.required}, c={0.constant}, ls={0.linenos}, \n{1}\n)'.format(
             self, data_repr).encode('utf-8')
 
 
@@ -104,9 +133,14 @@ class List(Variable):
         self.el_struct = el_struct
         super(List, self).__init__(**kwargs)
 
+    def clone(self):
+        rv = super(List, self).clone()
+        rv.el_struct = self.el_struct.clone()
+        return rv
+
     @classmethod
     def from_ast(cls, ast, el_struct, **kwargs):
-        kwargs.update(cls._get_kwargs_from_ast(ast))
+        kwargs = dict(cls._get_kwargs_from_ast(ast), **kwargs)
         return cls(el_struct, **kwargs)
 
     def __eq__(self, other):
@@ -114,7 +148,7 @@ class List(Variable):
 
     def __repr__(self):
         element_repr = _indent(pprint.pformat(self.el_struct), 2)
-        return u'List(r={0.required}, c={0.constant}, ls={0.linenos}, \n{1}\n)'.format(
+        return u'List({0.label}, r={0.required}, c={0.constant}, ls={0.linenos}, \n{1}\n)'.format(
             self, element_repr).encode('utf-8')
 
 
@@ -123,9 +157,14 @@ class Tuple(Variable):
         self.el_structs = tuple(el_structs) if el_structs is not None else None
         super(Tuple, self).__init__(**kwargs)
 
+    def clone(self):
+        rv = super(Tuple, self).clone()
+        rv.el_structs = tuple(s.clone() for s in self.el_structs)
+        return rv
+
     @classmethod
     def from_ast(cls, ast, el_structs, **kwargs):
-        kwargs.update(cls._get_kwargs_from_ast(ast))
+        kwargs = dict(cls._get_kwargs_from_ast(ast), **kwargs)
         return cls(el_structs, **kwargs)
 
     def __eq__(self, other):
@@ -133,17 +172,17 @@ class Tuple(Variable):
 
     def __repr__(self):
         el_structs_repr = _indent(pprint.pformat(self.el_structs), 2)
-        return u'Tuple(r={0.required}, c={0.constant}, ls={0.linenos} \n{1}\n)'.format(
+        return u'Tuple({0.label}, r={0.required}, c={0.constant}, ls={0.linenos} \n{1}\n)'.format(
             self, el_structs_repr).encode('utf-8')
 
 
 class Scalar(Variable):
     def __repr__(self):
-        return (u'Scalar(r={0.required}, c={0.constant}, '
+        return (u'Scalar({0.label}, r={0.required}, c={0.constant}, '
                 u'ls={0.linenos})').format(self).encode('utf-8')
 
 
 class Unknown(Variable):
     def __repr__(self):
-        return (u'Unknown(r={0.required}, c={0.constant}, '
+        return (u'Unknown({0.label}, r={0.required}, c={0.constant}, '
                 u'ls={0.linenos})'.format(self).encode('utf-8'))

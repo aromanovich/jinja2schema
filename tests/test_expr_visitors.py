@@ -9,7 +9,7 @@ from jinja2schema.model import Dictionary, Scalar, List, Unknown
 
 
 def get_context(ast):
-    return Context(return_struct=Scalar(), predicted_struct=Scalar.from_ast(ast))
+    return Context(return_struct_cls=Scalar(), predicted_struct=Scalar.from_ast(ast))
 
 
 def test_cond_expr():
@@ -22,7 +22,7 @@ def test_cond_expr():
         rtype, struct = visit_cond_expr(ast, get_context(ast))
 
         expected_struct = Dictionary({
-            'queue': Scalar(linenos=[1], may_be_defined=True)
+            'queue': Scalar(label='queue', linenos=[1], may_be_defined=True)
         })
         assert struct == expected_struct
 
@@ -32,21 +32,17 @@ def test_getattr_1():
     ast = parse(template).find(nodes.Getattr)
     rtype, struct = visit_getattr(ast, get_context(ast))
 
+    x_or_y_dict = {
+        'field': Dictionary({
+            'subfield': List(Dictionary({
+                'a': Scalar(label='a', linenos=[1])
+            }, linenos=[1]), label='subfield', linenos=[1]),
+        }, label='field', linenos=[1]),
+    }
+
     expected_struct = Dictionary({
-        'x': Dictionary({
-            'field': Dictionary({
-                'subfield': List(Dictionary({
-                    'a': Scalar(linenos=[1])
-                }, linenos=[1]), linenos=[1]),
-            }, linenos=[1]),
-        }, linenos=[1]),
-        'y': Dictionary({
-            'field': Dictionary({
-                'subfield': List(Dictionary({
-                    'a': Scalar(linenos=[1])
-                }, linenos=[1]), linenos=[1]),
-            }, linenos=[1]),
-        }, linenos=[1])
+        'x': Dictionary(x_or_y_dict, label='x', linenos=[1]),
+        'y': Dictionary(x_or_y_dict, label='y', linenos=[1])
     })
     assert struct == expected_struct
 
@@ -59,9 +55,9 @@ def test_getattr_2():
     expected_struct = Dictionary({
         'data': Dictionary({
             'field': Dictionary({
-                'subfield': Scalar(linenos=[1]),
-            }, linenos=[1]),
-        }, linenos=[1]),
+                'subfield': Scalar(label='subfield', linenos=[1]),
+            }, label='field', linenos=[1]),
+        }, label='data', linenos=[1]),
     })
     assert struct == expected_struct
 
@@ -76,15 +72,16 @@ def test_getattr_3():
             List(
                 List(
                     Dictionary({
-                        'x': Scalar(linenos=[2])
+                        'x': Scalar(label='x', linenos=[2])
                     }, linenos=[2]),
                     linenos=[2]),
                 linenos=[1]
             ),
+            label='a',
             linenos=[1]
         ),
-        'z': Scalar(linenos=[1]),
-        'n': Scalar(linenos=[2])
+        'z': Scalar(label='z', linenos=[1]),
+        'n': Scalar(label='n', linenos=[2])
     })
     assert struct == expected_struct
 
@@ -98,11 +95,11 @@ def test_getitem_1():
         'a': Dictionary({
             'b': Dictionary({
                 'c': List(Dictionary({
-                    'd': List(Scalar(linenos=[1]), linenos=[1])
-                }, linenos=[1]), linenos=[1]),
-            }, linenos=[1]),
-        }, linenos=[1]),
-        'x': Scalar(linenos=[1]),
+                    'd': List(Scalar(linenos=[1]), label='d', linenos=[1])
+                }, linenos=[1]), label='c', linenos=[1]),
+            }, label='b', linenos=[1]),
+        }, label='a', linenos=[1]),
+        'x': Scalar(label='x', linenos=[1]),
     })
     assert struct == expected_struct
 
@@ -113,9 +110,9 @@ def test_compare_1():
     rtype, struct = visit_compare(ast, get_context(ast))
 
     expected_struct = Dictionary({
-        'a': Scalar(linenos=[1]),
-        'b': Scalar(linenos=[1]),
-        'c': Scalar(linenos=[1]),
+        'a': Scalar(label='a', linenos=[1]),
+        'b': Scalar(label='b', linenos=[1]),
+        'c': Scalar(label='c', linenos=[1]),
     })
     assert struct == expected_struct
 
@@ -126,10 +123,10 @@ def test_compare_2():
     rtype, struct = visit_compare(ast, get_context(ast))
 
     expected_struct = Dictionary({
-        'a': Scalar(linenos=[1]),
-        'b': List(Scalar(linenos=[1]), linenos=[1]),
-        'c': Scalar(linenos=[1]),
-        'x': Scalar(linenos=[1]),
+        'a': Scalar(label='a', linenos=[1]),
+        'b': List(Scalar(linenos=[1]), label='b', linenos=[1]),
+        'c': Scalar(label='c', linenos=[1]),
+        'x': Scalar(label='x', linenos=[1]),
     })
     assert struct == expected_struct
 
@@ -139,7 +136,9 @@ def test_filter_1():
     ast = parse(template).find(nodes.Filter)
     rtype, struct = visit_filter(ast, get_context(ast))
 
-    expected_struct = Dictionary({'x': Scalar(linenos=[1])})
+    expected_struct = Dictionary({
+        'x': Scalar(label='x', linenos=[1]),
+    })
     assert struct == expected_struct
 
 
@@ -155,7 +154,9 @@ def test_filter_3():
     ast = parse(template).find(nodes.Filter)
     rtype, struct = visit_filter(ast, get_context(ast))
 
-    expected_struct = Dictionary({'x': Scalar(linenos=[1], used_with_default=True)})
+    expected_struct = Dictionary({
+        'x': Scalar(label='x', linenos=[1], used_with_default=True),
+    })
     assert struct == expected_struct
 
 
@@ -166,8 +167,8 @@ def test_filter_4():
 
     expected_struct = Dictionary({
         'xs': List(List(Dictionary({
-            'gsom': List(Unknown(), linenos=[1]),
-        }, linenos=[1]), linenos=[1]), linenos=[1]),
+            'gsom': List(Unknown(), label='gsom', linenos=[1]),
+        }, linenos=[1]), linenos=[1]), label='xs', linenos=[1]),
     })
     assert struct == expected_struct
 
@@ -178,7 +179,7 @@ def test_filter_5():
     rtype, struct = visit_filter(ast, get_context(ast))
 
     expected_struct = Dictionary({
-        'x': Scalar(linenos=[1]),
+        'x': Scalar(label='x', linenos=[1]),
     })
     assert struct == expected_struct
 
@@ -203,10 +204,10 @@ def test_test_1():
     rtype, struct = visit_test(ast, get_context(ast))
 
     expected_struct = Dictionary({
-        'x': Scalar(linenos=[1]),
+        'x': Scalar(label='x', linenos=[1]),
         'data': Dictionary({
-            'field': Scalar(linenos=[1]),
-        }, linenos=[1])
+            'field': Scalar(label='field', linenos=[1]),
+        }, label='data', linenos=[1])
     })
     assert struct == expected_struct
 
@@ -215,7 +216,7 @@ def test_test_1():
     rtype, struct = visit_test(ast, get_context(ast))
 
     expected_struct = Dictionary({
-        'x': Scalar(linenos=[1]),
+        'x': Scalar(label='x', linenos=[1]),
     })
     assert struct == expected_struct
 
@@ -226,7 +227,7 @@ def test_test_2():
     rtype, struct = visit_test(ast, get_context(ast))
 
     expected_struct = Dictionary({
-        'x': Unknown(linenos=[1])
+        'x': Unknown(label='x', linenos=[1])
     })
     assert struct == expected_struct
 

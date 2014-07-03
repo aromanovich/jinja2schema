@@ -21,8 +21,8 @@ def test_may_be_defined():
     '''
     struct = infer(parse(template))
     expected_struct = Dictionary({
-        'x': Scalar(linenos=[2, 3, 5], constant=False, may_be_defined=True),
-        'y': Scalar(linenos=[7, 10, 12], constant=False, may_be_defined=True),
+        'x': Scalar(linenos=[2, 3, 5], label='x', constant=False, may_be_defined=True),
+        'y': Scalar(linenos=[7, 10, 12], label='y', constant=False, may_be_defined=True),
     })
     assert struct == expected_struct
 
@@ -35,7 +35,7 @@ def test_may_be_defined():
     '''
     struct = infer(parse(template))
     expected_struct = Dictionary({
-        'x': Scalar(linenos=[2, 3, 4, 6], constant=False, may_be_defined=False),
+        'x': Scalar(linenos=[2, 3, 4, 6], label='x', constant=False, may_be_defined=False),
     })
     assert struct == expected_struct
 
@@ -47,9 +47,9 @@ def test_basics_1():
     '''
     struct = infer(parse(template))
     expected_struct = Dictionary({
-        'a': Scalar(linenos=[2]),
-        'z': Dictionary(data={
-            'qwerty': Unknown(linenos=[2]),
+        'a': Scalar(label='a', linenos=[2]),
+        'z': Dictionary(label='z', data={
+            'qwerty': Unknown(label='qwerty', linenos=[2]),
         }, linenos=[2]),
     })
     assert struct == expected_struct
@@ -92,13 +92,13 @@ def test_basics_2():
     '''
     struct = infer(parse(template))
     expected_struct = Dictionary({
-        'a': Scalar(linenos=[4, 6]),
-        'test1': Unknown(linenos=[2]),
-        'test2': Unknown(linenos=[3]),
+        'a': Scalar(label='a', linenos=[4, 6]),
+        'test1': Unknown(label='test1', linenos=[2]),
+        'test2': Unknown(label='test2', linenos=[3]),
         'z': Dictionary(data={
-            'qwerty': Unknown(linenos=[4]),
-            'gsom': Scalar(linenos=[6, 12]),
-        }, linenos=[4, 6, 12]),
+            'qwerty': Unknown(label='qwerty', linenos=[4]),
+            'gsom': Scalar(label='gsom', linenos=[6, 12]),
+        }, label='z', linenos=[4, 6, 12]),
     })
     assert struct == expected_struct
 
@@ -114,7 +114,7 @@ def test_basics_3():
     '''
     struct = infer(parse(template))
     expected_struct = Dictionary({
-        'x': Scalar(linenos=[2, 3, 5, 7]),
+        'x': Scalar(label='x', linenos=[2, 3, 5, 7]),
     })
     assert struct == expected_struct
 
@@ -128,7 +128,7 @@ def test_basics_3():
     '''
     struct = infer(parse(template))
     expected_struct = Dictionary({
-        'z': Unknown(linenos=[2]),
+        'z': Unknown(label='z', linenos=[2]),
     })
     assert struct == expected_struct
 
@@ -151,9 +151,9 @@ def test_basics_4():
     '''
     struct = infer(parse(template))
     expected_struct = Dictionary({
-        'configuration': Scalar(may_be_defined=True, constant=False, linenos=[6]),
-        'queue': Scalar(may_be_defined=True, constant=False, linenos=[9]),
-        'timestamp': Scalar(constant=False, linenos=[7])
+        'configuration': Scalar(label='configuration', may_be_defined=True, constant=False, linenos=[6, 7]),
+        'queue': Scalar(label='queue', may_be_defined=True, constant=False, linenos=[9]),
+        'timestamp': Scalar(label='timestamp', constant=False, linenos=[7])
     })
     assert struct == expected_struct
 
@@ -169,8 +169,8 @@ def test_basics_5():
     struct = infer(parse(template))
     expected_struct = Dictionary({
         'items': List(Dictionary({
-            'x': Scalar(linenos=[4])
-        }, linenos=[4]), linenos=[2, 3]),
+            'x': Scalar(label='x', linenos=[4])
+        }, label='column', linenos=[4]), label='items', linenos=[2, 3]),
     })
     assert struct == expected_struct
 
@@ -182,7 +182,7 @@ def test_basics_6():
     '''
     struct = infer(parse(template))
     expected_struct = Dictionary({
-        'items': List(Unknown(), linenos=[2]),
+        'items': List(Unknown(), label='items', linenos=[2]),
     })
     assert struct == expected_struct
 
@@ -196,8 +196,8 @@ def test_basics_7():
     struct = infer(parse(template))
     expected_struct = Dictionary({
         'items': List(Dictionary({
-            'name': Scalar(linenos=[3]),
-        }, linenos=[3]), linenos=[2, 3]),
+            'name': Scalar(label='name', linenos=[3]),
+        }, linenos=[3]), label='items', linenos=[2, 3]),
     })
     assert struct == expected_struct
 
@@ -215,9 +215,9 @@ def test_basics_8():
     assert isinstance(e.actual_ast, nodes.Filter)
     assert e.expected_struct == List(
         Dictionary({
-            'name': Scalar(required=True, constant=False, linenos=[3])
-        }, required=True, constant=False, linenos=[3]),
-        required=True, constant=False, linenos=[2, 3]
+            'name': Scalar(label='name', constant=False, linenos=[3])
+        }, constant=False, linenos=[3]),
+        label='row', constant=False, linenos=[2, 3]
     )
     assert e.actual_struct == List(List(Unknown()))
 
@@ -229,7 +229,7 @@ def test_basics_9():
     '''
     struct = infer(parse(template))
     expected_struct = Dictionary({
-        'items': List(Unknown(), linenos=[2]),  # TODO it should be Scalar
+        'items': List(Unknown(), label='items', linenos=[2]),  # TODO it should be Scalar
     })
     assert struct == expected_struct
 
@@ -242,7 +242,7 @@ def test_basics_10():
     '''
     struct = infer(parse(template))
     expected_struct = Dictionary({
-        'data': Dictionary({}, linenos=[2]),
+        'data': Dictionary({}, label='data', linenos=[2]),
     })
     assert struct == expected_struct
 
@@ -260,12 +260,13 @@ def test_basics_11():
     struct = infer(parse(template))
     expected_struct = Dictionary({
         'a': Dictionary({
-            'attr1': List(Scalar(), linenos=[3]),
-            'attr2': List(Scalar(linenos=[4]), linenos=[4], used_with_default=True),
-            'attr3': Scalar(linenos=[5], used_with_default=True)
-        }, linenos=[2, 3, 4, 5]),
+            'attr1': List(Scalar(), label='attr1', linenos=[3]),
+            'attr2': List(Scalar(linenos=[4]), label='attr2', linenos=[4], used_with_default=True),
+            'attr3': Scalar(label='attr3', linenos=[5], used_with_default=True)
+        }, label='a', linenos=[2, 3, 4, 5]),
         'xs': List(
-            Scalar(linenos=[7]),  # TODO it should be Dictionary({'is_active': Unknown()})
+            Scalar(label='x', linenos=[7]),  # TODO it should be Dictionary({'is_active': Unknown()})
+            label='xs',
             linenos=[6]
         ),
     })
@@ -281,7 +282,7 @@ def test_basics_12():
     '''
     struct = infer(parse(template))
     expected_struct = Dictionary({
-        'data': Dictionary({}, linenos=[2]),
+        'data': Dictionary({}, label='data', linenos=[2]),
     })
     assert struct == expected_struct
 
@@ -316,7 +317,7 @@ def test_call_range():
     '''
     struct = infer(parse(template))
     expected_struct = Dictionary({
-        'users': List(Unknown(), linenos=[2]),
+        'users': List(Unknown(), label='users', linenos=[2]),
     })
     assert struct == expected_struct
 
@@ -340,8 +341,8 @@ def test_call_lipsum():
     struct = infer(parse(template))
     expected_struct = Dictionary({
         'a': Dictionary({
-            'field': Scalar(linenos=[2]),
-        }, linenos=[2]),
+            'field': Scalar(label='field', linenos=[2]),
+        }, label='a', linenos=[2]),
     })
     assert struct == expected_struct
 
@@ -355,3 +356,19 @@ def test_call_lipsum():
     template = '{{ lipsum(n=10).field }}'
     with pytest.raises(UnexpectedExpression):
         infer(parse(template))
+
+
+def test_just_test():
+    template = '''
+    {% set args = ['foo'] if foo else [] %}
+    {% set args = args + ['bar'] %}
+    {% set args = args + (['zork'] if zork else []) %}
+    f({{args|join(sep)}});
+    '''
+    struct = infer(parse(template))
+    expected_struct = Dictionary({
+        'foo': Unknown(label='foo', linenos=[2]),
+        'zork': Unknown(label='zork', linenos=[4]),
+        'sep': Scalar(label='sep', linenos=[5])
+    })
+    assert struct == expected_struct

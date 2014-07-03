@@ -16,28 +16,28 @@ def test_for_1():
     struct = visit_for(ast)
     expected_struct = Dictionary({
         'a': Dictionary({
-            'b': List(Scalar(linenos=[3]), linenos=[2])
-        }, linenos=[2]),
+            'b': List(Scalar(label='x', linenos=[3]), label='b', linenos=[2])
+        }, label='a', linenos=[2]),
     })
     assert struct == expected_struct
 
 
 def test_for_2():
     template = '''
-        {% for x in xs %}
-            {{ x }}
-            {% for y in ys %}
-                {{ loop.index0 }}
-            {% endfor %}
-            {{ loop.length }}
+    {% for x in xs %}
+        {{ x }}
+        {% for y in ys %}
+            {{ loop.index0 }}
         {% endfor %}
+        {{ loop.length }}
+    {% endfor %}
     '''
     ast = parse(template)
     struct = infer(ast)
 
     expected_struct = Dictionary({
-        'xs': List(Scalar(linenos=[3]), linenos=[2]),
-        'ys': List(Unknown(linenos=[4]), linenos=[4]),
+        'xs': List(Scalar(label='x', linenos=[3]), label='xs', linenos=[2]),
+        'ys': List(Unknown(linenos=[4]), label='ys', linenos=[4]),
     })
     assert struct == expected_struct
 
@@ -55,11 +55,11 @@ def test_for_3():
     expected_struct = Dictionary({
         'list': List(Tuple((
             Dictionary({
-                'field': Scalar(required=True, linenos=[3])
-            }, linenos=[3]),
-            Scalar(required=True, linenos=[4])
-        ), linenos=[2]), linenos=[2])
-    }, required=True, constant=False)
+                'field': Scalar(label='field', linenos=[3])
+            }, label='a', linenos=[3]),
+            Scalar(label='b', linenos=[4])
+        ), linenos=[2]), label='list', linenos=[2])
+    }, constant=False)
     assert struct == expected_struct
 
 
@@ -69,8 +69,8 @@ def test_assign_1():
 
     struct = visit_assign(ast)
     expected_struct = Dictionary({
-        'a': Unknown(constant=True),   # TODO linenos
-        'b': Unknown()
+        'a': Unknown(label='a', linenos=[1], constant=True),
+        'b': Unknown(label='b', linenos=[1]),
     })
     assert struct == expected_struct
 
@@ -81,7 +81,7 @@ def test_assign_2():
 
     struct = visit_assign(ast)
     expected_struct = Dictionary({
-        'y': Scalar(linenos=[1])
+        'y': Scalar(label='y', linenos=[1])
     })
     assert struct == expected_struct
 
@@ -99,11 +99,11 @@ def test_assign_4():
 
     struct = visit_assign(ast)
     expected_struct = Dictionary({
-        'a': Scalar(linenos=[1], constant=True),
+        'a': Scalar(label='a', linenos=[1], constant=True),
         'b': Dictionary(data={
             'gsom': Scalar(linenos=[1], constant=True),
-        }, linenos=[1], constant=True),
-        'z': Scalar(linenos=[1]),
+        }, label='b', linenos=[1], constant=True),
+        'z': Scalar(label='z', linenos=[1]),
     })
     assert struct == expected_struct
 
@@ -123,7 +123,7 @@ def test_assign_5():
             Dictionary({
                 'data': Scalar(linenos=[3, 4], constant=True)
             }, linenos=[3, 4], constant=True),
-        ], linenos=[3, 4], constant=True), linenos=[2], constant=True)
+        ], linenos=[3, 4], constant=True), label='weights', linenos=[2], constant=True)
     })
     assert struct == expected_struct
 
@@ -152,10 +152,10 @@ def test_if_1():
 
     expected_struct = Dictionary({
         'z': Dictionary({
-            'field': Scalar(linenos=[4]),
-        }, linenos=[2, 4]),
-        'x': Scalar(linenos=[2, 3]),
-        'y': Unknown(linenos=[2]),
+            'field': Scalar(label='field', linenos=[4]),
+        }, label='z', linenos=[2, 4]),
+        'x': Scalar(label='x', linenos=[2, 3]),
+        'y': Unknown(label='y', linenos=[2]),
     })
     assert struct == expected_struct
 
@@ -170,8 +170,8 @@ def test_if_2():
     '''
     struct = infer(parse(template))
     expected_struct = Dictionary({
-        'x': Scalar(linenos=[2, 4, 6]),
-        'y': Unknown(linenos=[2, 4]),
-        'z': Unknown(linenos=[2, 4]),
+        'x': Scalar(label='x', linenos=[2, 4, 6]),
+        'y': Unknown(label='y', linenos=[2, 4]),
+        'z': Unknown(label='z', linenos=[2, 4]),
     })
     assert struct == expected_struct
