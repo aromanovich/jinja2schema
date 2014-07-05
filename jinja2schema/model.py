@@ -152,64 +152,61 @@ class Dictionary(Variable):
 
 
 class List(Variable):
-    def __init__(self, el_struct, **kwargs):
-        self.el_struct = el_struct
+    def __init__(self, item, **kwargs):
+        self.item = item
         super(List, self).__init__(**kwargs)
 
     def clone(self):
         rv = super(List, self).clone()
-        rv.el_struct = self.el_struct.clone()
+        rv.item = self.item.clone()
         return rv
 
     @classmethod
-    def from_ast(cls, ast, el_struct, **kwargs):
+    def from_ast(cls, ast, item, **kwargs):
         kwargs = dict(cls._get_kwargs_from_ast(ast), **kwargs)
-        return cls(el_struct, **kwargs)
+        return cls(item, **kwargs)
 
     def __eq__(self, other):
-        return super(List, self).__eq__(other) and self.el_struct == other.el_struct
+        return super(List, self).__eq__(other) and self.item == other.item
 
     def __repr__(self):
-        return pprint.pformat([self.el_struct])
-        #element_repr = _indent(pprint.pformat(self.el_struct), 2)
-        #return u'List({0.label}, r={0.required}, c={0.constant}, ls={0.linenos}, \n{1}\n)'.format(
-        #    self, element_repr).encode('utf-8')
+        return pprint.pformat([self.item])
 
     def to_json_schema(self):
         rv = super(List, self).to_json_schema()
         rv.update({
             'type': 'array',
-            'items': self.el_struct.to_json_schema(),
+            'items': self.item.to_json_schema(),
         })
         return rv
 
 
 class Tuple(Variable):
-    def __init__(self, el_structs, **kwargs):
-        self.el_structs = tuple(el_structs) if el_structs is not None else None
+    def __init__(self, items, **kwargs):
+        self.items = tuple(items) if items is not None else None
         super(Tuple, self).__init__(**kwargs)
 
     def clone(self):
         rv = super(Tuple, self).clone()
-        rv.el_structs = tuple(s.clone() for s in self.el_structs)
+        rv.items = tuple(s.clone() for s in self.items)
         return rv
 
     @classmethod
-    def from_ast(cls, ast, el_structs, **kwargs):
+    def from_ast(cls, ast, items, **kwargs):
         kwargs = dict(cls._get_kwargs_from_ast(ast), **kwargs)
-        return cls(el_structs, **kwargs)
+        return cls(items, **kwargs)
 
     def __eq__(self, other):
-        return super(Tuple, self).__eq__(other) and self.el_structs == other.el_structs
+        return super(Tuple, self).__eq__(other) and self.items == other.items
 
     def __repr__(self):
-        return pprint.pformat(self.el_structs)
+        return pprint.pformat(self.items)
 
     def to_json_schema(self):
         rv = super(Tuple, self).to_json_schema()
         rv.update({
             'type': 'array',
-            'items': [el_struct.to_json_schema() for el_struct in self.el_structs],
+            'items': [item.to_json_schema() for item in self.items],
         })
         return rv
 

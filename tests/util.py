@@ -26,7 +26,7 @@ def _debug_repr(var):
             rv.append('})')
         elif isinstance(var, Tuple):
             rv.append('Tuple({},'.format(_format_attrs(var)))
-            for el in var.el_structs:
+            for el in var.items:
                 el_repr = _debug_repr(el)
                 el_repr[-1] += ','
                 rv.extend(_indent(el_repr, spaces=4))
@@ -34,7 +34,7 @@ def _debug_repr(var):
             rv.append(')')
         elif isinstance(var, List):
             rv.append('List({},'.format(_format_attrs(var)))
-            rv.extend(_indent(_debug_repr(var.el_struct), spaces=4))
+            rv.extend(_indent(_debug_repr(var.item), spaces=4))
             rv.append(')')
     elif isinstance(var, Scalar):
         rv = ['Scalar({})'.format(_format_attrs(var))]

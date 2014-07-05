@@ -82,14 +82,14 @@ def merge(fst, snd):
             elif k in snd:
                 result[k] = snd[k]
     elif isinstance(fst, List) and isinstance(snd, List):
-        result = List(merge(fst.el_struct, snd.el_struct))
+        result = List(merge(fst.item, snd.item))
     elif isinstance(fst, Tuple) and isinstance(snd, Tuple):
-        if fst.el_structs is snd.el_structs is None:
+        if fst.items is snd.items is None:
             result = Tuple(None)
         else:
-            if len(fst.el_structs) != len(snd.el_structs):
+            if len(fst.items) != len(snd.items):
                 raise MergeException(fst, snd)
-            result = Tuple([merge(a, b) for a, b in zip(fst.el_structs, snd.el_structs)])
+            result = Tuple([merge(a, b) for a, b in zip(fst.items, snd.items)])
     else:
         raise MergeException(fst, snd)
     result.label = fst.label or snd.label
@@ -283,7 +283,7 @@ def visit_filter(ast, ctx):
         node_struct = merge(
             List(List(Unknown(), linenos=[ast.node.lineno]), linenos=[ast.node.lineno]),
             ctx.get_predicted_struct()
-        ).el_struct
+        ).item
     elif ast.name == 'default':
         default_value_rtype, default_value_struct = visit_expr(
             ast.args[0], Context(predicted_struct=Unknown.from_ast(ast.args[0])))
@@ -325,7 +325,7 @@ def visit_filter(ast, ctx):
         node_struct = merge(
             List(Scalar.from_ast(ast.node)),
             ctx.get_predicted_struct()
-        ).el_struct
+        ).item
     elif ast.name == 'pprint':
         ctx.meet(Scalar(), ast)
         node_struct = ctx.get_predicted_struct()
@@ -375,7 +375,7 @@ def visit_list(ast, ctx):
     ctx.meet(List(Unknown()), ast)
     struct = Dictionary()
 
-    predicted_struct = merge(List(Unknown()), ctx.get_predicted_struct()).el_struct
+    predicted_struct = merge(List(Unknown()), ctx.get_predicted_struct()).item
     el_rtype = None
     for item in ast.items:
         item_rtype, item_struct = visit_expr(item, Context(predicted_struct=predicted_struct))
