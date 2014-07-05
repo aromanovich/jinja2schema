@@ -1,10 +1,13 @@
-from jinja2schema.model import Variable
 import difflib
+
+from jinja2schema.model import Variable
+from .util import debug_repr, _debug_repr
+
 
 def pytest_assertrepr_compare(op, left, right):
     if isinstance(left, Variable) and isinstance(right, Variable) and op == '==':
-        left = str(left).split('\n')
-        right = str(right).split('\n')
+        left = _debug_repr(left)
+        right = _debug_repr(right)
         return (
             ['comparing two structures'] +
             left +

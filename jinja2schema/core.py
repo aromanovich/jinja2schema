@@ -41,6 +41,9 @@ class MergeException(Exception):
         self.fst = fst
         self.snd = snd
 
+    def __str__(self):
+        return 'Conflict!'
+
 
 class UnexpectedExpression(Exception):
     def __init__(self, expected_struct, actual_ast, actual_struct):
@@ -98,11 +101,10 @@ def merge(fst, snd):
 
 
 def merge_rtypes(fst, snd, operator=None):
-    if operator == '+':
+    if operator in ('+', '-'):
         if type(fst) is not type(snd) and not (isinstance(fst, Unknown) or isinstance(snd, Unknown)):
             raise MergeException(fst, snd)
-    rv = merge(fst, snd)
-    return rv
+    return merge(fst, snd)
 
 
 stmt_visitors = {}

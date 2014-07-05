@@ -3,11 +3,6 @@ import pprint
 from jinja2 import nodes
 
 
-def _indent(s, spaces_num):
-    lines = s.split('\n')
-    return '\n'.join([spaces_num * ' ' + line for line in lines])
-
-
 class Variable(object):
     """A base variable class.
 
@@ -144,9 +139,7 @@ class Dictionary(Variable):
         return self.data.pop(key, default)
 
     def __repr__(self):
-        data_repr = _indent(pprint.pformat(self.data), 2)
-        return u'Dictionary({0.label}, r={0.required}, c={0.constant}, ls={0.linenos}, \n{1}\n)'.format(
-            self, data_repr).encode('utf-8')
+        return pprint.pformat(self.data)
 
     def to_json_schema(self):
         rv = super(Dictionary, self).to_json_schema()
@@ -177,9 +170,10 @@ class List(Variable):
         return super(List, self).__eq__(other) and self.el_struct == other.el_struct
 
     def __repr__(self):
-        element_repr = _indent(pprint.pformat(self.el_struct), 2)
-        return u'List({0.label}, r={0.required}, c={0.constant}, ls={0.linenos}, \n{1}\n)'.format(
-            self, element_repr).encode('utf-8')
+        return pprint.pformat([self.el_struct])
+        #element_repr = _indent(pprint.pformat(self.el_struct), 2)
+        #return u'List({0.label}, r={0.required}, c={0.constant}, ls={0.linenos}, \n{1}\n)'.format(
+        #    self, element_repr).encode('utf-8')
 
     def to_json_schema(self):
         rv = super(List, self).to_json_schema()
@@ -209,9 +203,7 @@ class Tuple(Variable):
         return super(Tuple, self).__eq__(other) and self.el_structs == other.el_structs
 
     def __repr__(self):
-        el_structs_repr = _indent(pprint.pformat(self.el_structs), 2)
-        return u'Tuple({0.label}, r={0.required}, c={0.constant}, ls={0.linenos} \n{1}\n)'.format(
-            self, el_structs_repr).encode('utf-8')
+        return pprint.pformat(self.el_structs)
 
     def to_json_schema(self):
         rv = super(Tuple, self).to_json_schema()
@@ -224,8 +216,7 @@ class Tuple(Variable):
 
 class Scalar(Variable):
     def __repr__(self):
-        return (u'Scalar({0.label}, r={0.required}, c={0.constant}, '
-                u'ls={0.linenos})').format(self).encode('utf-8')
+        return self.label or '<scalar>'
 
     def to_json_schema(self):
         rv = super(Scalar, self).to_json_schema()
@@ -242,8 +233,7 @@ class Scalar(Variable):
 
 class Unknown(Variable):
     def __repr__(self):
-        return (u'Unknown({0.label}, r={0.required}, c={0.constant}, '
-                u'ls={0.linenos})'.format(self).encode('utf-8'))
+        return self.label or '<unknown>'
 
     def to_json_schema(self):
         rv = super(Unknown, self).to_json_schema()
