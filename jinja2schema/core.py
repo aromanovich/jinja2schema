@@ -1,4 +1,8 @@
 """
+
+
+
+
 There are two types of visitors, expression and statement.
 
 Expression visitors return tuple which contains expression type and expression structure.
@@ -562,7 +566,7 @@ def _post_process(struct):
     return struct
 
 
-def infer(ast):
+def infer_from_ast(ast):
     """
     :type ast: :class:`nodes.Template`
     """
@@ -570,7 +574,11 @@ def infer(ast):
     return _post_process(rv)
 
 
-def parse(template):
-    jinja2_env = jinja2.Environment()
-    ast = jinja2_env.parse(template)
-    return ast
+def parse(template, jinja2_env=None):
+    if jinja2_env is None:
+        jinja2_env = jinja2.Environment()
+    return jinja2_env.parse(template)
+
+
+def infer(template):
+    return infer_from_ast(parse(template))

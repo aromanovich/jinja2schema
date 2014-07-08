@@ -1,7 +1,7 @@
 import difflib
 
 from jinja2schema.model import Variable
-from .util import debug_repr, _debug_repr
+from jinja2schema.util import _debug_repr
 
 
 def pytest_assertrepr_compare(op, left, right):

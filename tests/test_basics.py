@@ -1,7 +1,7 @@
 import pytest
 from jinja2 import nodes
 
-from jinja2schema.core import infer, parse, MergeException, UnexpectedExpression
+from jinja2schema.core import infer, MergeException, UnexpectedExpression
 from jinja2schema.model import List, Dictionary, Scalar, Unknown
 
 
@@ -19,7 +19,7 @@ def test_may_be_defined():
     {% endif %}
     {{ y }}
     '''
-    struct = infer(parse(template))
+    struct = infer(template)
     expected_struct = Dictionary({
         'x': Scalar(linenos=[2, 3, 5], label='x', constant=False, may_be_defined=True),
         'y': Scalar(linenos=[7, 10, 12], label='y', constant=False, may_be_defined=True),
@@ -33,7 +33,7 @@ def test_may_be_defined():
     {% endif %}
     {{ x }}
     '''
-    struct = infer(parse(template))
+    struct = infer(template)
     expected_struct = Dictionary({
         'x': Scalar(linenos=[2, 3, 4, 6], label='x', constant=False, may_be_defined=False),
     })
@@ -45,7 +45,7 @@ def test_basics_1():
     {% set d = {'x': 123, a: z.qwerty} %}
     {{ d.x }}
     '''
-    struct = infer(parse(template))
+    struct = infer(template)
     expected_struct = Dictionary({
         'a': Scalar(label='a', linenos=[2]),
         'z': Dictionary(label='z', data={
@@ -59,21 +59,21 @@ def test_basics_1():
     {{ d.x.field }}
     '''
     with pytest.raises(MergeException):
-        infer(parse(template))
+        infer(template)
 
     template = '''
     {% set x = '123' %}
     {{ x.test }}
     '''
     with pytest.raises(MergeException):
-        infer(parse(template))
+        infer(template)
 
     template = '''
     {% set a = {'x': 123} %}
     {% set b = {a: 'test'} %}
     '''
     with pytest.raises(MergeException):
-        infer(parse(template))
+        infer(template)
 
 
 def test_basics_2():
@@ -90,7 +90,7 @@ def test_basics_2():
     {% endif %}
     {{ z.gsom }}
     '''
-    struct = infer(parse(template))
+    struct = infer(template)
     expected_struct = Dictionary({
         'a': Scalar(label='a', linenos=[4, 6]),
         'test1': Unknown(label='test1', linenos=[2]),
@@ -112,7 +112,7 @@ def test_basics_3():
     {% endif %}
     {{ x }}
     '''
-    struct = infer(parse(template))
+    struct = infer(template)
     expected_struct = Dictionary({
         'x': Scalar(label='x', linenos=[2, 3, 5, 7]),
     })
@@ -126,7 +126,7 @@ def test_basics_3():
     {% endif %}
     {{ x }}
     '''
-    struct = infer(parse(template))
+    struct = infer(template)
     expected_struct = Dictionary({
         'z': Unknown(label='z', linenos=[2]),
     })
@@ -149,7 +149,7 @@ def test_basics_4():
         {{ x }} {{ y }}
     {% endfor %}
     '''
-    struct = infer(parse(template))
+    struct = infer(template)
     expected_struct = Dictionary({
         'configuration': Scalar(label='configuration', may_be_defined=True, constant=False, linenos=[6, 7]),
         'queue': Scalar(label='queue', may_be_defined=True, constant=False, linenos=[9]),
@@ -166,7 +166,7 @@ def test_basics_5():
         {% endfor %}
     {% endfor %}
     '''
-    struct = infer(parse(template))
+    struct = infer(template)
     expected_struct = Dictionary({
         'items': List(Dictionary({
             'x': Scalar(label='x', linenos=[4])
@@ -180,7 +180,7 @@ def test_basics_6():
     {% for row in items|batch(3, '&nbsp;') %}
     {% endfor %}
     '''
-    struct = infer(parse(template))
+    struct = infer(template)
     expected_struct = Dictionary({
         'items': List(Unknown(), label='items', linenos=[2]),
     })
@@ -193,7 +193,7 @@ def test_basics_7():
         {{ row[1][1].name }}
     {% endfor %}
     '''
-    struct = infer(parse(template))
+    struct = infer(template)
     expected_struct = Dictionary({
         'items': List(Dictionary({
             'name': Scalar(label='name', linenos=[3]),
@@ -209,7 +209,7 @@ def test_basics_8():
     {% endfor %}
     '''
     with pytest.raises(UnexpectedExpression) as excinfo:
-        infer(parse(template))
+        infer(template)
     e = excinfo.value
 
     assert isinstance(e.actual_ast, nodes.Filter)
@@ -227,7 +227,7 @@ def test_basics_9():
     {% set xs = items|batch(3, '&nbsp;') %}
     {{ xs[0][0] }}
     '''
-    struct = infer(parse(template))
+    struct = infer(template)
     expected_struct = Dictionary({
         'items': List(Unknown(), label='items', linenos=[2]),  # TODO it should be Scalar
     })
@@ -240,7 +240,7 @@ def test_basics_10():
     {% for x, y in items %}
     {% endfor %}
     '''
-    struct = infer(parse(template))
+    struct = infer(template)
     expected_struct = Dictionary({
         'data': Dictionary({}, label='data', linenos=[2]),
     })
@@ -257,7 +257,7 @@ def test_basics_11():
         {{ x }}
     {% endfor %}
     '''
-    struct = infer(parse(template))
+    struct = infer(template)
     expected_struct = Dictionary({
         'a': Dictionary({
             'attr1': List(Scalar(), label='attr1', linenos=[3]),
@@ -280,7 +280,7 @@ def test_basics_12():
         {{ v }}
     {% endfor %}
     '''
-    struct = infer(parse(template))
+    struct = infer(template)
     expected_struct = Dictionary({
         'data': Dictionary({}, label='data', linenos=[2]),
     })
@@ -295,7 +295,7 @@ def test_basics_13():  # test dictsort
     {% endfor %}
     '''
     with pytest.raises(UnexpectedExpression):
-        infer(parse(template))
+        infer(template)
 
 
 def test_raw_1():
@@ -304,7 +304,7 @@ def test_raw_1():
         {{ x }}
     {% endraw %}
     '''
-    struct = infer(parse(template))
+    struct = infer(template)
     expected_struct = Dictionary()
     assert struct == expected_struct
 
@@ -315,7 +315,7 @@ def test_call_range():
         {{ number }}
     {% endfor %}
     '''
-    struct = infer(parse(template))
+    struct = infer(template)
     expected_struct = Dictionary({
         'users': List(Unknown(), label='users', linenos=[2]),
     })
@@ -327,18 +327,18 @@ def test_call_range():
     {% endfor %}
     '''
     with pytest.raises(MergeException):
-        infer(parse(template))
+        infer(template)
 
     template = '{{ range(10 - users|length) }}'
     with pytest.raises(UnexpectedExpression):
-        infer(parse(template))
+        infer(template)
 
 
 def test_call_lipsum():
     template = '''
     {{ lipsum(n=a.field) }}
     '''
-    struct = infer(parse(template))
+    struct = infer(template)
     expected_struct = Dictionary({
         'a': Dictionary({
             'field': Scalar(label='field', linenos=[2]),
@@ -351,11 +351,11 @@ def test_call_lipsum():
     {% endfor %}
     '''
     with pytest.raises(UnexpectedExpression):
-        infer(parse(template))
+        infer(template)
 
     template = '{{ lipsum(n=10).field }}'
     with pytest.raises(UnexpectedExpression):
-        infer(parse(template))
+        infer(template)
 
 
 def test_just_test():
@@ -365,7 +365,7 @@ def test_just_test():
     {% set args = args + (['zork'] if zork else []) %}
     f({{args|join(sep)}});
     '''
-    struct = infer(parse(template))
+    struct = infer(template)
     expected_struct = Dictionary({
         'foo': Unknown(label='foo', linenos=[2]),
         'zork': Unknown(label='zork', linenos=[4]),

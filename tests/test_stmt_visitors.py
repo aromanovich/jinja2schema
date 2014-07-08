@@ -1,7 +1,7 @@
 from jinja2 import nodes
 import pytest
 
-from jinja2schema.core import (parse, infer, MergeException, UnexpectedExpression,
+from jinja2schema.core import (parse, infer_from_ast, MergeException, UnexpectedExpression,
                                visit_assign, visit_if, visit_for)
 from jinja2schema.model import Dictionary, Scalar, List, Unknown, Tuple
 
@@ -33,7 +33,7 @@ def test_for_2():
     {% endfor %}
     '''
     ast = parse(template)
-    struct = infer(ast)
+    struct = infer_from_ast(ast)
 
     expected_struct = Dictionary({
         'xs': List(Scalar(label='x', linenos=[3]), label='xs', linenos=[2]),
@@ -168,7 +168,7 @@ def test_if_2():
     {% endif %}
     {{ x }}
     '''
-    struct = infer(parse(template))
+    struct = infer_from_ast(parse(template))
     expected_struct = Dictionary({
         'x': Scalar(label='x', linenos=[2, 4, 6]),
         'y': Unknown(label='y', linenos=[2, 4]),
