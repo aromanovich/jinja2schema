@@ -9,7 +9,7 @@ from jinja2schema.model import Dictionary, Scalar, List, Unknown
 
 
 def get_context(ast):
-    return Context(return_struct_cls=Scalar(), predicted_struct=Scalar.from_ast(ast))
+    return Context(return_struct_cls=Scalar, predicted_struct=Scalar.from_ast(ast))
 
 
 def test_cond_expr():
