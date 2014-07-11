@@ -12,11 +12,13 @@ import itertools
 import jinja2
 from jinja2 import nodes
 
-from .model import Scalar, Dictionary, List, Unknown, Tuple
+from .model import Variable, Scalar, Dictionary, List, Unknown, Tuple
 
 
 class Context(object):
     """
+    Context is used when parsing expressions.
+
     Suppose there is an expression::
 
         {{ data.field.subfield }}
@@ -31,7 +33,7 @@ class Context(object):
             attr='subfield'
         )
 
-    `visit_getattr` returns a pair that looks like this::
+    :func:`visit_getattr` returns a pair that looks like this::
 
         (
             # return type:
@@ -50,29 +52,30 @@ class Context(object):
     in this case is being printed.
     The structure is build during AST traversal from outer to inners nodes and it is
     kind of "reversed" in relation to the AST.
-    A context is intended for:
+    :class:`Context` is intended for:
+
     * capturing a return type and passing it to the innermost expression node;
-    * passing a structure "under construction" to visitors of nested nodes.
+    * passing a structure "under construction" to the visitors of nested nodes.
 
     Let's look through an example.
 
-    Suppose :func:`visit_getattr(ast, context)` is called with the following arguments:
+    Suppose :func:`visit_getattr` is called with the following arguments::
 
        ast = Getattr(node=Getattr(node=Name(name='data'), attr='field'), attr='subfield'))
        context = Context(return_struct_cls=Scalar, predicted_struct=Scalar())
 
     It looks to the outermost AST node and based on it's type (which is :class:`nodes.Getattr`)
-    and it's `attr` field (which equals to `"subfield"`) infers that a variable described by the
-    nested AST node must a dictionary with `"subfield"` key.
+    and it's ``attr`` field (which equals to ``"subfield"``) infers that a variable described by the
+    nested AST node must a dictionary with ``"subfield"`` key.
 
-    It calls a visitor for inner node and `visit_getattr` gets called again, but
-    with different arguments:
+    It calls a visitor for inner node and :func:`visit_getattr` gets called again, but
+    with different arguments::
 
        ast = Getattr(node=Name(name='data', ctx='load'), attr='field')
        ctx = Context(return_struct_cls=Scalar, predicted_struct=Dictionary({subfield: Scalar()}))
 
-    `visit_getattr` applies the same logic again. The inner node is a :class:`nodes.Name`, so that
-    it calls :func:`visit_name` with the following arguments:
+    :func:`visit_getattr` applies the same logic again. The inner node is a :class:`nodes.Name`, so that
+    it calls :func:`visit_name` with the following arguments::
 
        ast = Name(name='data')
        ctx = Context(
@@ -82,7 +85,7 @@ class Context(object):
            })
        )
 
-    `visit_name` does not do much by itself. Based on a context in knows what structure and
+    :func:`visit_name` does not do much by itself. Based on a context in knows what structure and
     what type must have a variable described by a given :class:`nodes.Name` node, so
     it just returns a pair::
 
@@ -100,8 +103,7 @@ class Context(object):
 
     def meet(self, actual_struct, actual_ast):
         try:
-            if self.predicted_struct:
-                merge(self.predicted_struct, actual_struct)
+            merge(self.predicted_struct, actual_struct)
         except MergeException:
             raise UnexpectedExpression(self.predicted_struct, actual_ast, actual_struct)
         else:
@@ -109,32 +111,93 @@ class Context(object):
 
 
 class MergeException(Exception):
+    """Conflict of merging two structures.
+
+    .. attribute:: fst
+
+        :class:`Variable`
+
+    .. attribute:: snd
+
+        :class:`Variable`
+    """
     def __init__(self, fst, snd):
         self.fst = fst
         self.snd = snd
 
     def __str__(self):
-        return 'Conflict!'
+        get_label = lambda s: 'unnamed variable' if s.label is None else 'variable "{}"'.format(s.label)
+        get_usage = lambda s: s.__class__.__name__.lower()
+        get_linenos = lambda s: ','.join(map(str, s.linenos))
+        return ('{fst_label} (lines: {fst_linenos}, used as {fst_usage}) conflicts with '
+                '{snd_label} (lines: {snd_linenos}, used as {snd_usage})').format(
+                    fst_label=get_label(self.fst), snd_label=get_label(self.snd),
+                    fst_usage=get_usage(self.fst), snd_usage=get_usage(self.snd),
+                    fst_linenos=get_linenos(self.fst), snd_linenos=get_linenos(self.snd))
 
 
 class UnexpectedExpression(Exception):
+    """Raised when a visitor was expecting compatibility with :attr:`expected_struct`,
+    but got :attr:`actual_ast` of structure :attr:`actual_struct`.
+
+    Compatibility is checked by merging expected structure with actual one.
+
+    .. attribute:: expected_struct
+
+        expected :class:`.model.Variable`
+
+    .. attribute:: actual_ast
+
+        actual :class:`jinja2.nodes.Node`
+
+    .. attribute:: actual_ast
+
+        :class:`.model.Variable` described by ``actual_ast``
+    """
     def __init__(self, expected_struct, actual_ast, actual_struct):
         self.expected_struct = expected_struct
         self.actual_ast = actual_ast
         self.actual_struct = actual_struct
 
     def __str__(self):
-        return 'Got {} of structure {}, expected: {}'.format(
-            self.actual_ast, self.actual_struct, self.expected_struct)
+        return ('conflict on the line {lineno}\n'
+                'got: AST node jinja2.nodes.{node} of structure {actual_struct}\n'
+                'expected structure: {expected_struct}').format(
+                    lineno=self.actual_ast.lineno,
+                    node=self.actual_ast.__class__.__name__,
+                    actual_struct=self.actual_struct,
+                    expected_struct=self.expected_struct)
 
 
-class UnsupportedSyntax(Exception):
+class InvalidExpression(Exception):
+    """Raised when a template uses Jinja2 features that are not supported by the library
+    or when a template contains incorrect expressions (i.e., such as applying ``divisibleby`` filter
+    without an argument).
+
+    .. attribute:: ast
+
+        :class:`jinja2.nodes.Node` caused the exception
+    """
     def __init__(self, ast, message):
         self.ast = ast
         self.message = message
 
+    def __str__(self):
+        return 'line {}: {}'.format(self.ast.lineno, self.message)
+
 
 def merge(fst, snd):
+    """Merges two variables.
+
+    :param fst: first variable
+    :type fst: :class:`.model.Variable`
+    :param snd: second variable
+    :type snd: :class:`.model.Variable`
+
+    .. note::
+
+        ``fst`` must reflect expressions that occur in template **before** the expressions of ``snd``.
+    """
     assert (not (fst.linenos and snd.linenos) or
             max(fst.linenos) <= min(snd.linenos))
 
@@ -261,7 +324,7 @@ def visit_getitem(ast, ctx):
                 arg.value: ctx.get_predicted_struct(label=arg.value),
             })
         else:
-            raise UnsupportedSyntax(arg, '{} is not supported as an index for a list or'
+            raise InvalidExpression(arg, '{} is not supported as an index for a list or'
                                          ' a key for a dictionary'.format(arg.value))
     else:
         predicted_struct = List.from_ast(arg, ctx.get_predicted_struct())
@@ -282,11 +345,11 @@ def visit_test(ast, ctx):
                       'none', 'number', 'sameas', 'sequence', 'string'):
         predicted_struct = Unknown.from_ast(ast.node)
     else:
-        raise UnsupportedSyntax(ast, 'unknown test "{}"'.format(ast.name))
+        raise InvalidExpression(ast, 'unknown test "{}"'.format(ast.name))
     rtype, struct = visit_expr(ast.node, Context(return_struct_cls=Scalar, predicted_struct=predicted_struct))
     if ast.name == 'divisibleby':
         if not ast.args:
-            raise UnsupportedSyntax(ast, 'divisibleby must have an argument')
+            raise InvalidExpression(ast, 'divisibleby must have an argument')
         _, arg_struct = visit_expr(ast.args[0],
                                    Context(predicted_struct=Scalar.from_ast(ast.args[0])))
         struct = merge(arg_struct, struct)
@@ -336,10 +399,10 @@ def visit_call(ast, ctx):
         elif ast.node.name == 'dict':
             ctx.meet(Dictionary(), ast)
             if ast.args:
-                raise UnsupportedSyntax(ast, 'dict accepts only keyword arguments')
+                raise InvalidExpression(ast, 'dict accepts only keyword arguments')
             return _visit_dict(ast, ctx, [(kwarg.key, kwarg.value) for kwarg in ast.kwargs])
         else:
-            raise UnsupportedSyntax(ast, '"{}" call is not supported yet'.format(ast.node.name))
+            raise InvalidExpression(ast, '"{}" call is not supported yet'.format(ast.node.name))
 
 
 @visits_expr(nodes.Filter)
@@ -405,9 +468,9 @@ def visit_filter(ast, ctx):
         ctx.meet(Scalar(), ast)
         node_struct = Dictionary.from_ast(ast.node)
     elif ast.name == 'attr':
-        raise UnsupportedSyntax(ast, 'attr filter is not supported')
+        raise InvalidExpression(ast, 'attr filter is not supported')
     else:
-        raise UnsupportedSyntax(ast, 'unknown filter')
+        raise InvalidExpression(ast, 'unknown filter')
 
     return visit_expr(ast.node, Context(
         return_struct_cls=ctx.return_struct_cls,
@@ -550,7 +613,7 @@ def visit_assign(ast):
             variables.append((ast.target.name, ast.node))
         else:
             if len(ast.target.items) != len(ast.node.items):
-                raise UnsupportedSyntax(ast, 'number of items in left side is different '
+                raise InvalidExpression(ast, 'number of items in left side is different '
                                              'from right side')
             for name_ast, var_ast in itertools.izip(ast.target.items, ast.node.items):
                 variables.append((name_ast.name, var_ast))
@@ -572,7 +635,7 @@ def visit_assign(ast):
             ast.node, Context(return_struct_cls=Unknown, predicted_struct=Tuple(tuple_items)))
         return merge(struct, var_struct)
     else:
-        raise UnsupportedSyntax(ast, 'unsupported assignment')
+        raise InvalidExpression(ast, 'unsupported assignment')
 
 
 @visits_stmt(nodes.Output)
@@ -643,10 +706,20 @@ def infer_from_ast(ast):
 
 
 def parse(template, jinja2_env=None):
+    """
+    :type template: basestring
+    :type jinja2_env: :class:`jinja2.Environment`
+    :rtype: :class:`nodes.Template`
+    """
     if jinja2_env is None:
         jinja2_env = jinja2.Environment()
     return jinja2_env.parse(template)
 
 
 def infer(template):
+    """Returns a :class:`Dictionary` that describes a structure of a context required by ``template``.
+
+    :type template: basestring
+    :rtype: class:`Dictionary`
+    """
     return infer_from_ast(parse(template))

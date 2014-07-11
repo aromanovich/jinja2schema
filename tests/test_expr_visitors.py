@@ -1,7 +1,7 @@
 import pytest
 from jinja2 import nodes
 
-from jinja2schema.core import (parse, Context, UnsupportedSyntax, UnexpectedExpression,
+from jinja2schema.core import (parse, Context, InvalidExpression, UnexpectedExpression,
                                visit_getitem, visit_cond_expr, visit_test,
                                visit_getattr, visit_compare, visit_filter,
                                visit_call)
@@ -187,7 +187,7 @@ def test_filter_5():
 def test_filter_6():
     template = '''{{ x|unknownfilter }}'''
     ast = parse(template).find(nodes.Filter)
-    with pytest.raises(UnsupportedSyntax):
+    with pytest.raises(InvalidExpression):
         visit_filter(ast, get_context(ast))
 
 

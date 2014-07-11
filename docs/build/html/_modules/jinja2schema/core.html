@@ -1,0 +1,882 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>jinja2schema.core &mdash; jinja2schema 0.0.1 documentation</title>
+  
+
+  
+  
+
+  
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+    <link rel="top" title="jinja2schema 0.0.1 documentation" href="../../index.html"/>
+        <link rel="up" title="Module code" href="../index.html"/> 
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-nav-search">
+        <a href="../../index.html" class="fa fa-home"> jinja2schema</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+        
+        
+            <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">Internals</a></li>
+</ul>
+<ul class="simple">
+</ul>
+<ul class="simple">
+</ul>
+
+        
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">jinja2schema</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+      
+    <li>jinja2schema.core</li>
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            
+  <h1>Source code for jinja2schema.core</h1><div class="highlight"><pre>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">There are two types of visitors, expression and statement.</span>
+
+<span class="sd">Expression visitors return tuple which contains expression type and expression structure.</span>
+
+<span class="sd">Statement visitors return :class:`.models.Dictionary` which contains</span>
+<span class="sd">structures of variables used within the statement.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">functools</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+
+<span class="kn">import</span> <span class="nn">jinja2</span>
+<span class="kn">from</span> <span class="nn">jinja2</span> <span class="kn">import</span> <span class="n">nodes</span>
+
+<span class="kn">from</span> <span class="nn">.model</span> <span class="kn">import</span> <span class="n">Variable</span><span class="p">,</span> <span class="n">Scalar</span><span class="p">,</span> <span class="n">Dictionary</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Unknown</span><span class="p">,</span> <span class="n">Tuple</span>
+
+
+<div class="viewcode-block" id="Context"><a class="viewcode-back" href="../../api.html#jinja2schema.core.Context">[docs]</a><span class="k">class</span> <span class="nc">Context</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Context is used when parsing expressions.</span>
+
+<span class="sd">    Suppose there is an expression::</span>
+
+<span class="sd">        {{ data.field.subfield }}</span>
+
+<span class="sd">    It has the following AST::</span>
+
+<span class="sd">        Getattr(</span>
+<span class="sd">            node=Getattr(</span>
+<span class="sd">                node=Name(name=&#39;data&#39;)</span>
+<span class="sd">                attr=&#39;field&#39;</span>
+<span class="sd">            ),</span>
+<span class="sd">            attr=&#39;subfield&#39;</span>
+<span class="sd">        )</span>
+
+<span class="sd">    :func:`visit_getattr` returns a pair that looks like this::</span>
+
+<span class="sd">        (</span>
+<span class="sd">            # return type:</span>
+<span class="sd">            Scalar(...),</span>
+<span class="sd">            # structure:</span>
+<span class="sd">            {</span>
+<span class="sd">                &#39;data: {</span>
+<span class="sd">                    &#39;field&#39;: {</span>
+<span class="sd">                        &#39;subfield&#39;: Scalar(...)</span>
+<span class="sd">                    }</span>
+<span class="sd">                }</span>
+<span class="sd">            }</span>
+<span class="sd">        }</span>
+
+<span class="sd">    The return type is defined by the outermost :class:`nodes.Getattr` node, which</span>
+<span class="sd">    in this case is being printed.</span>
+<span class="sd">    The structure is build during AST traversal from outer to inners nodes and it is</span>
+<span class="sd">    kind of &quot;reversed&quot; in relation to the AST.</span>
+<span class="sd">    :class:`Context` is intended for:</span>
+
+<span class="sd">    * capturing a return type and passing it to the innermost expression node;</span>
+<span class="sd">    * passing a structure &quot;under construction&quot; to the visitors of nested nodes.</span>
+
+<span class="sd">    Let&#39;s look through an example.</span>
+
+<span class="sd">    Suppose :func:`visit_getattr` is called with the following arguments::</span>
+
+<span class="sd">       ast = Getattr(node=Getattr(node=Name(name=&#39;data&#39;), attr=&#39;field&#39;), attr=&#39;subfield&#39;))</span>
+<span class="sd">       context = Context(return_struct_cls=Scalar, predicted_struct=Scalar())</span>
+
+<span class="sd">    It looks to the outermost AST node and based on it&#39;s type (which is :class:`nodes.Getattr`)</span>
+<span class="sd">    and it&#39;s ``attr`` field (which equals to ``&quot;subfield&quot;``) infers that a variable described by the</span>
+<span class="sd">    nested AST node must a dictionary with ``&quot;subfield&quot;`` key.</span>
+
+<span class="sd">    It calls a visitor for inner node and :func:`visit_getattr` gets called again, but</span>
+<span class="sd">    with different arguments::</span>
+
+<span class="sd">       ast = Getattr(node=Name(name=&#39;data&#39;, ctx=&#39;load&#39;), attr=&#39;field&#39;)</span>
+<span class="sd">       ctx = Context(return_struct_cls=Scalar, predicted_struct=Dictionary({subfield: Scalar()}))</span>
+
+<span class="sd">    :func:`visit_getattr` applies the same logic again. The inner node is a :class:`nodes.Name`, so that</span>
+<span class="sd">    it calls :func:`visit_name` with the following arguments::</span>
+
+<span class="sd">       ast = Name(name=&#39;data&#39;)</span>
+<span class="sd">       ctx = Context(</span>
+<span class="sd">           return_struct_cls=Scalar,</span>
+<span class="sd">           predicted_struct=Dictionary({</span>
+<span class="sd">               field: Dictionary({subfield: Scalar()}))</span>
+<span class="sd">           })</span>
+<span class="sd">       )</span>
+
+<span class="sd">    :func:`visit_name` does not do much by itself. Based on a context in knows what structure and</span>
+<span class="sd">    what type must have a variable described by a given :class:`nodes.Name` node, so</span>
+<span class="sd">    it just returns a pair::</span>
+
+<span class="sd">        (instance of context.return_struct_cls, Dictionary({data: context.predicted_struct}})</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">return_struct_cls</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">predicted_struct</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">return_struct_cls</span> <span class="o">=</span> <span class="n">return_struct_cls</span> <span class="k">if</span> <span class="n">return_struct_cls</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="k">else</span> <span class="n">Unknown</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">predicted_struct</span> <span class="o">=</span> <span class="n">predicted_struct</span> <span class="k">if</span> <span class="n">predicted_struct</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="k">else</span> <span class="n">Unknown</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">get_predicted_struct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">predicted_struct</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">label</span><span class="p">:</span>
+            <span class="n">rv</span><span class="o">.</span><span class="n">label</span> <span class="o">=</span> <span class="n">label</span>
+        <span class="k">return</span> <span class="n">rv</span>
+
+    <span class="k">def</span> <span class="nf">meet</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">actual_struct</span><span class="p">,</span> <span class="n">actual_ast</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">merge</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">predicted_struct</span><span class="p">,</span> <span class="n">actual_struct</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">MergeException</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">UnexpectedExpression</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">predicted_struct</span><span class="p">,</span> <span class="n">actual_ast</span><span class="p">,</span> <span class="n">actual_struct</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">True</span>
+
+</div>
+<div class="viewcode-block" id="MergeException"><a class="viewcode-back" href="../../api.html#jinja2schema.core.MergeException">[docs]</a><span class="k">class</span> <span class="nc">MergeException</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Conflict of merging two structures.</span>
+
+<span class="sd">    .. attribute:: fst</span>
+
+<span class="sd">        :class:`Variable`</span>
+
+<span class="sd">    .. attribute:: snd</span>
+
+<span class="sd">        :class:`Variable`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fst</span><span class="p">,</span> <span class="n">snd</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fst</span> <span class="o">=</span> <span class="n">fst</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">snd</span> <span class="o">=</span> <span class="n">snd</span>
+
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">get_label</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="s">&#39;unnamed variable&#39;</span> <span class="k">if</span> <span class="n">s</span><span class="o">.</span><span class="n">label</span> <span class="ow">is</span> <span class="bp">None</span> <span class="k">else</span> <span class="s">&#39;variable &quot;{}&quot;&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">label</span><span class="p">)</span>
+        <span class="n">get_usage</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="n">s</span><span class="o">.</span><span class="n">__class__</span><span class="o">.</span><span class="n">__name__</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="n">get_linenos</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="s">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">s</span><span class="o">.</span><span class="n">linenos</span><span class="p">))</span>
+        <span class="k">return</span> <span class="p">(</span><span class="s">&#39;{fst_label} (lines: {fst_linenos}, used as {fst_usage}) conflicts with &#39;</span>
+                <span class="s">&#39;{snd_label} (lines: {snd_linenos}, used as {snd_usage})&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">fst_label</span><span class="o">=</span><span class="n">get_label</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fst</span><span class="p">),</span> <span class="n">snd_label</span><span class="o">=</span><span class="n">get_label</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">snd</span><span class="p">),</span>
+                    <span class="n">fst_usage</span><span class="o">=</span><span class="n">get_usage</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fst</span><span class="p">),</span> <span class="n">snd_usage</span><span class="o">=</span><span class="n">get_usage</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">snd</span><span class="p">),</span>
+                    <span class="n">fst_linenos</span><span class="o">=</span><span class="n">get_linenos</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fst</span><span class="p">),</span> <span class="n">snd_linenos</span><span class="o">=</span><span class="n">get_linenos</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">snd</span><span class="p">))</span>
+
+</div>
+<div class="viewcode-block" id="UnexpectedExpression"><a class="viewcode-back" href="../../api.html#jinja2schema.core.UnexpectedExpression">[docs]</a><span class="k">class</span> <span class="nc">UnexpectedExpression</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Raised when a visitor was expecting compatibility with :attr:`expected_struct`,</span>
+<span class="sd">    but got :attr:`actual_ast` of structure :attr:`actual_struct`.</span>
+
+<span class="sd">    Compatibility is checked by merging expected structure with actual one.</span>
+
+<span class="sd">    .. attribute:: expected_struct</span>
+
+<span class="sd">        expected :class:`.model.Variable`</span>
+
+<span class="sd">    .. attribute:: actual_ast</span>
+
+<span class="sd">        actual :class:`jinja2.nodes.Node`</span>
+
+<span class="sd">    .. attribute:: actual_ast</span>
+
+<span class="sd">        :class:`.model.Variable` described by ``actual_ast``</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">expected_struct</span><span class="p">,</span> <span class="n">actual_ast</span><span class="p">,</span> <span class="n">actual_struct</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">expected_struct</span> <span class="o">=</span> <span class="n">expected_struct</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">actual_ast</span> <span class="o">=</span> <span class="n">actual_ast</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">actual_struct</span> <span class="o">=</span> <span class="n">actual_struct</span>
+
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span><span class="s">&#39;conflict on the line {lineno}</span><span class="se">\n</span><span class="s">&#39;</span>
+                <span class="s">&#39;got: AST node jinja2.nodes.{node} of structure {actual_struct}</span><span class="se">\n</span><span class="s">&#39;</span>
+                <span class="s">&#39;expected structure: {expected_struct}&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">lineno</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">actual_ast</span><span class="o">.</span><span class="n">lineno</span><span class="p">,</span>
+                    <span class="n">node</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">actual_ast</span><span class="o">.</span><span class="n">__class__</span><span class="o">.</span><span class="n">__name__</span><span class="p">,</span>
+                    <span class="n">actual_struct</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">actual_struct</span><span class="p">,</span>
+                    <span class="n">expected_struct</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">expected_struct</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="InvalidExpression"><a class="viewcode-back" href="../../api.html#jinja2schema.core.InvalidExpression">[docs]</a><span class="k">class</span> <span class="nc">InvalidExpression</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Raised when a template uses Jinja2 features that are not supported by the library</span>
+<span class="sd">    or when a template contains incorrect expressions (i.e., such as applying ``divisibleby`` filter</span>
+<span class="sd">    without an argument).</span>
+
+<span class="sd">    .. attribute:: ast</span>
+
+<span class="sd">        :class:`jinja2.nodes.Node` caused the exception</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ast</span><span class="p">,</span> <span class="n">message</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ast</span> <span class="o">=</span> <span class="n">ast</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">message</span> <span class="o">=</span> <span class="n">message</span>
+
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s">&#39;line {}: {}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ast</span><span class="o">.</span><span class="n">lineno</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">message</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="merge"><a class="viewcode-back" href="../../api.html#jinja2schema.core.merge">[docs]</a><span class="k">def</span> <span class="nf">merge</span><span class="p">(</span><span class="n">fst</span><span class="p">,</span> <span class="n">snd</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Merges two variables.</span>
+
+<span class="sd">    :param fst: first variable</span>
+<span class="sd">    :type fst: :class:`.model.Variable`</span>
+<span class="sd">    :param snd: second variable</span>
+<span class="sd">    :type snd: :class:`.model.Variable`</span>
+
+<span class="sd">    .. note::</span>
+
+<span class="sd">        ``fst`` must reflect expressions that occur in template **before** the expressions of ``snd``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">assert</span> <span class="p">(</span><span class="ow">not</span> <span class="p">(</span><span class="n">fst</span><span class="o">.</span><span class="n">linenos</span> <span class="ow">and</span> <span class="n">snd</span><span class="o">.</span><span class="n">linenos</span><span class="p">)</span> <span class="ow">or</span>
+            <span class="nb">max</span><span class="p">(</span><span class="n">fst</span><span class="o">.</span><span class="n">linenos</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="nb">min</span><span class="p">(</span><span class="n">snd</span><span class="o">.</span><span class="n">linenos</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fst</span><span class="p">,</span> <span class="n">Unknown</span><span class="p">):</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">snd</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">snd</span><span class="p">,</span> <span class="n">Unknown</span><span class="p">):</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">fst</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fst</span><span class="p">,</span> <span class="n">Scalar</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">snd</span><span class="p">,</span> <span class="n">Scalar</span><span class="p">):</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">Scalar</span><span class="p">()</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fst</span><span class="p">,</span> <span class="n">Dictionary</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">snd</span><span class="p">,</span> <span class="n">Dictionary</span><span class="p">):</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">Dictionary</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">set</span><span class="p">(</span><span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="n">fst</span><span class="o">.</span><span class="n">iterkeys</span><span class="p">(),</span> <span class="n">snd</span><span class="o">.</span><span class="n">iterkeys</span><span class="p">())):</span>
+            <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">fst</span> <span class="ow">and</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">snd</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">merge</span><span class="p">(</span><span class="n">fst</span><span class="p">[</span><span class="n">k</span><span class="p">],</span> <span class="n">snd</span><span class="p">[</span><span class="n">k</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">fst</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">fst</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+            <span class="k">elif</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">snd</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">snd</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fst</span><span class="p">,</span> <span class="n">List</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">snd</span><span class="p">,</span> <span class="n">List</span><span class="p">):</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">List</span><span class="p">(</span><span class="n">merge</span><span class="p">(</span><span class="n">fst</span><span class="o">.</span><span class="n">item</span><span class="p">,</span> <span class="n">snd</span><span class="o">.</span><span class="n">item</span><span class="p">))</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fst</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">snd</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">fst</span><span class="o">.</span><span class="n">items</span> <span class="ow">is</span> <span class="n">snd</span><span class="o">.</span><span class="n">items</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">Tuple</span><span class="p">(</span><span class="bp">None</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">fst</span><span class="o">.</span><span class="n">items</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">snd</span><span class="o">.</span><span class="n">items</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="n">MergeException</span><span class="p">(</span><span class="n">fst</span><span class="p">,</span> <span class="n">snd</span><span class="p">)</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">Tuple</span><span class="p">([</span><span class="n">merge</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span> <span class="k">for</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">fst</span><span class="o">.</span><span class="n">items</span><span class="p">,</span> <span class="n">snd</span><span class="o">.</span><span class="n">items</span><span class="p">)])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">MergeException</span><span class="p">(</span><span class="n">fst</span><span class="p">,</span> <span class="n">snd</span><span class="p">)</span>
+    <span class="n">result</span><span class="o">.</span><span class="n">label</span> <span class="o">=</span> <span class="n">fst</span><span class="o">.</span><span class="n">label</span> <span class="ow">or</span> <span class="n">snd</span><span class="o">.</span><span class="n">label</span>
+    <span class="n">result</span><span class="o">.</span><span class="n">linenos</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">fst</span><span class="o">.</span><span class="n">linenos</span> <span class="o">+</span> <span class="n">snd</span><span class="o">.</span><span class="n">linenos</span><span class="p">)))</span>
+    <span class="n">result</span><span class="o">.</span><span class="n">constant</span> <span class="o">=</span> <span class="n">fst</span><span class="o">.</span><span class="n">constant</span>
+    <span class="n">result</span><span class="o">.</span><span class="n">may_be_defined</span> <span class="o">=</span> <span class="n">fst</span><span class="o">.</span><span class="n">may_be_defined</span>
+    <span class="n">result</span><span class="o">.</span><span class="n">used_with_default</span> <span class="o">=</span> <span class="n">fst</span><span class="o">.</span><span class="n">used_with_default</span> <span class="ow">and</span> <span class="n">snd</span><span class="o">.</span><span class="n">used_with_default</span>
+    <span class="k">return</span> <span class="n">result</span>
+
+</div>
+<span class="k">def</span> <span class="nf">merge_rtypes</span><span class="p">(</span><span class="n">fst</span><span class="p">,</span> <span class="n">snd</span><span class="p">,</span> <span class="n">operator</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">operator</span> <span class="ow">in</span> <span class="p">(</span><span class="s">&#39;+&#39;</span><span class="p">,</span> <span class="s">&#39;-&#39;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">fst</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="nb">type</span><span class="p">(</span><span class="n">snd</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">fst</span><span class="p">,</span> <span class="n">Unknown</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">snd</span><span class="p">,</span> <span class="n">Unknown</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="n">MergeException</span><span class="p">(</span><span class="n">fst</span><span class="p">,</span> <span class="n">snd</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">merge</span><span class="p">(</span><span class="n">fst</span><span class="p">,</span> <span class="n">snd</span><span class="p">)</span>
+
+
+<span class="n">stmt_visitors</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="n">expr_visitors</span> <span class="o">=</span> <span class="p">{}</span>
+
+
+<span class="k">def</span> <span class="nf">visits_stmt</span><span class="p">(</span><span class="n">node_cls</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">decorator</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+        <span class="n">stmt_visitors</span><span class="p">[</span><span class="n">node_cls</span><span class="p">]</span> <span class="o">=</span> <span class="n">func</span>
+        <span class="nd">@functools.wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+        <span class="k">def</span> <span class="nf">wrapped_func</span><span class="p">(</span><span class="n">ast</span><span class="p">):</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">node_cls</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">func</span><span class="p">(</span><span class="n">ast</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">wrapped_func</span>
+    <span class="k">return</span> <span class="n">decorator</span>
+
+
+<span class="k">def</span> <span class="nf">visits_expr</span><span class="p">(</span><span class="n">node_cls</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">decorator</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+        <span class="n">expr_visitors</span><span class="p">[</span><span class="n">node_cls</span><span class="p">]</span> <span class="o">=</span> <span class="n">func</span>
+        <span class="nd">@functools.wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+        <span class="k">def</span> <span class="nf">wrapped_func</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">node_cls</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">func</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">wrapped_func</span>
+    <span class="k">return</span> <span class="n">decorator</span>
+
+
+<span class="nd">@visits_expr</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">BinExpr</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">visit_bin_expr</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span>
+    <span class="n">l_rtype</span><span class="p">,</span> <span class="n">l_struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">left</span><span class="p">,</span> <span class="n">ctx</span><span class="p">)</span>
+    <span class="n">r_rtype</span><span class="p">,</span> <span class="n">r_struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">right</span><span class="p">,</span> <span class="n">ctx</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">merge_rtypes</span><span class="p">(</span><span class="n">l_rtype</span><span class="p">,</span> <span class="n">r_rtype</span><span class="p">,</span> <span class="n">operator</span><span class="o">=</span><span class="n">ast</span><span class="o">.</span><span class="n">operator</span><span class="p">),</span> <span class="n">merge</span><span class="p">(</span><span class="n">l_struct</span><span class="p">,</span> <span class="n">r_struct</span><span class="p">)</span>
+
+
+<span class="nd">@visits_expr</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">UnaryExpr</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">visit_unary_expr</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">)</span>
+
+
+<span class="nd">@visits_expr</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">Compare</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">visit_compare</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span>
+    <span class="n">rtype</span><span class="p">,</span> <span class="n">struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">expr</span><span class="p">,</span> <span class="n">ctx</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">ast</span><span class="o">.</span><span class="n">ops</span><span class="p">:</span>
+        <span class="n">op_rtype</span><span class="p">,</span> <span class="n">op_struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">expr</span><span class="p">,</span> <span class="n">ctx</span><span class="p">)</span>
+        <span class="n">rtype</span> <span class="o">=</span> <span class="n">merge_rtypes</span><span class="p">(</span><span class="n">rtype</span><span class="p">,</span> <span class="n">op_rtype</span><span class="p">,</span> <span class="n">operator</span><span class="o">=</span><span class="n">op</span><span class="o">.</span><span class="n">op</span><span class="p">)</span>
+        <span class="n">struct</span> <span class="o">=</span> <span class="n">merge</span><span class="p">(</span><span class="n">struct</span><span class="p">,</span> <span class="n">op_struct</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">rtype</span><span class="p">,</span> <span class="n">struct</span>
+
+
+<span class="nd">@visits_expr</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">Slice</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">visit_slice</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span>
+    <span class="n">nodes</span> <span class="o">=</span> <span class="p">[</span><span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="p">[</span><span class="n">ast</span><span class="o">.</span><span class="n">start</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">stop</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">step</span><span class="p">]</span> <span class="k">if</span> <span class="n">node</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">Unknown</span><span class="p">(),</span> <span class="n">visit_nodes_and_merge</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">Scalar</span><span class="p">)</span>
+
+
+<span class="nd">@visits_expr</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">Name</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">visit_name</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">ctx</span><span class="o">.</span><span class="n">return_struct_cls</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">ast</span><span class="p">),</span> <span class="n">Dictionary</span><span class="p">({</span>
+        <span class="n">ast</span><span class="o">.</span><span class="n">name</span><span class="p">:</span> <span class="n">ctx</span><span class="o">.</span><span class="n">get_predicted_struct</span><span class="p">(</span><span class="n">label</span><span class="o">=</span><span class="n">ast</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+    <span class="p">})</span>
+
+
+<span class="nd">@visits_expr</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">Getattr</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">visit_getattr</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span>
+    <span class="n">context</span> <span class="o">=</span> <span class="n">Context</span><span class="p">(</span>
+        <span class="n">return_struct_cls</span><span class="o">=</span><span class="n">ctx</span><span class="o">.</span><span class="n">return_struct_cls</span><span class="p">,</span>
+        <span class="n">predicted_struct</span><span class="o">=</span><span class="n">Dictionary</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="p">{</span>
+            <span class="n">ast</span><span class="o">.</span><span class="n">attr</span><span class="p">:</span> <span class="n">ctx</span><span class="o">.</span><span class="n">get_predicted_struct</span><span class="p">(</span><span class="n">label</span><span class="o">=</span><span class="n">ast</span><span class="o">.</span><span class="n">attr</span><span class="p">),</span>
+        <span class="p">}))</span>
+    <span class="k">return</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+
+
+<span class="nd">@visits_expr</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">Getitem</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">visit_getitem</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span>
+    <span class="n">arg</span> <span class="o">=</span> <span class="n">ast</span><span class="o">.</span><span class="n">arg</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">nodes</span><span class="o">.</span><span class="n">Const</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="n">predicted_struct</span> <span class="o">=</span> <span class="n">List</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">ctx</span><span class="o">.</span><span class="n">get_predicted_struct</span><span class="p">())</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="nb">basestring</span><span class="p">):</span>
+            <span class="n">predicted_struct</span> <span class="o">=</span> <span class="n">Dictionary</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="p">{</span>
+                <span class="n">arg</span><span class="o">.</span><span class="n">value</span><span class="p">:</span> <span class="n">ctx</span><span class="o">.</span><span class="n">get_predicted_struct</span><span class="p">(</span><span class="n">label</span><span class="o">=</span><span class="n">arg</span><span class="o">.</span><span class="n">value</span><span class="p">),</span>
+            <span class="p">})</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">InvalidExpression</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="s">&#39;{} is not supported as an index for a list or&#39;</span>
+                                         <span class="s">&#39; a key for a dictionary&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">arg</span><span class="o">.</span><span class="n">value</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">predicted_struct</span> <span class="o">=</span> <span class="n">List</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">ctx</span><span class="o">.</span><span class="n">get_predicted_struct</span><span class="p">())</span>
+
+    <span class="n">_</span><span class="p">,</span> <span class="n">arg_struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">Context</span><span class="p">(</span><span class="n">predicted_struct</span><span class="o">=</span><span class="n">Scalar</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">arg</span><span class="p">)))</span>
+    <span class="n">rtype</span><span class="p">,</span> <span class="n">struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="p">,</span> <span class="n">Context</span><span class="p">(</span>
+        <span class="n">return_struct_cls</span><span class="o">=</span><span class="n">ctx</span><span class="o">.</span><span class="n">return_struct_cls</span><span class="p">,</span>
+        <span class="n">predicted_struct</span><span class="o">=</span><span class="n">predicted_struct</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">rtype</span><span class="p">,</span> <span class="n">merge</span><span class="p">(</span><span class="n">struct</span><span class="p">,</span> <span class="n">arg_struct</span><span class="p">)</span>
+
+
+<span class="nd">@visits_expr</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">Test</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">visit_test</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">ast</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s">&#39;divisibleby&#39;</span><span class="p">,</span> <span class="s">&#39;escaped&#39;</span><span class="p">,</span> <span class="s">&#39;even&#39;</span><span class="p">,</span> <span class="s">&#39;lower&#39;</span><span class="p">,</span> <span class="s">&#39;odd&#39;</span><span class="p">,</span> <span class="s">&#39;upper&#39;</span><span class="p">):</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">meet</span><span class="p">(</span><span class="n">Scalar</span><span class="p">(),</span> <span class="n">ast</span><span class="p">)</span>
+        <span class="n">predicted_struct</span> <span class="o">=</span> <span class="n">Scalar</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">ast</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s">&#39;defined&#39;</span><span class="p">,</span> <span class="s">&#39;undefined&#39;</span><span class="p">,</span> <span class="s">&#39;equalto&#39;</span><span class="p">,</span> <span class="s">&#39;iterable&#39;</span><span class="p">,</span> <span class="s">&#39;mapping&#39;</span><span class="p">,</span>
+                      <span class="s">&#39;none&#39;</span><span class="p">,</span> <span class="s">&#39;number&#39;</span><span class="p">,</span> <span class="s">&#39;sameas&#39;</span><span class="p">,</span> <span class="s">&#39;sequence&#39;</span><span class="p">,</span> <span class="s">&#39;string&#39;</span><span class="p">):</span>
+        <span class="n">predicted_struct</span> <span class="o">=</span> <span class="n">Unknown</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">InvalidExpression</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="s">&#39;unknown test &quot;{}&quot;&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">name</span><span class="p">))</span>
+    <span class="n">rtype</span><span class="p">,</span> <span class="n">struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="p">,</span> <span class="n">Context</span><span class="p">(</span><span class="n">return_struct_cls</span><span class="o">=</span><span class="n">Scalar</span><span class="p">,</span> <span class="n">predicted_struct</span><span class="o">=</span><span class="n">predicted_struct</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">ast</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s">&#39;divisibleby&#39;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ast</span><span class="o">.</span><span class="n">args</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">InvalidExpression</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="s">&#39;divisibleby must have an argument&#39;</span><span class="p">)</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">arg_struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                                   <span class="n">Context</span><span class="p">(</span><span class="n">predicted_struct</span><span class="o">=</span><span class="n">Scalar</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])))</span>
+        <span class="n">struct</span> <span class="o">=</span> <span class="n">merge</span><span class="p">(</span><span class="n">arg_struct</span><span class="p">,</span> <span class="n">struct</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">rtype</span><span class="p">,</span> <span class="n">struct</span>
+
+
+<span class="nd">@visits_expr</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">Concat</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">visit_concat</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span>
+    <span class="n">ctx</span><span class="o">.</span><span class="n">meet</span><span class="p">(</span><span class="n">Scalar</span><span class="p">(),</span> <span class="n">ast</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">Scalar</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">ast</span><span class="p">),</span> <span class="n">visit_nodes_and_merge</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">nodes</span><span class="p">,</span> <span class="n">Scalar</span><span class="p">)</span>
+
+
+<span class="nd">@visits_expr</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">CondExpr</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">visit_cond_expr</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span>
+    <span class="n">test_rtype</span><span class="p">,</span> <span class="n">test_struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">test</span><span class="p">,</span> <span class="n">Context</span><span class="p">(</span><span class="n">predicted_struct</span><span class="o">=</span><span class="n">Unknown</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">test</span><span class="p">)))</span>
+    <span class="n">if_rtype</span><span class="p">,</span> <span class="n">if_struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">expr1</span><span class="p">,</span> <span class="n">ctx</span><span class="p">)</span>
+    <span class="n">else_rtype</span><span class="p">,</span> <span class="n">else_struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">expr2</span><span class="p">,</span> <span class="n">ctx</span><span class="p">)</span>
+    <span class="n">struct</span> <span class="o">=</span> <span class="n">merge</span><span class="p">(</span><span class="n">merge</span><span class="p">(</span><span class="n">if_struct</span><span class="p">,</span> <span class="n">test_struct</span><span class="p">),</span> <span class="n">else_struct</span><span class="p">)</span>
+    <span class="n">rtype</span> <span class="o">=</span> <span class="n">merge_rtypes</span><span class="p">(</span><span class="n">if_rtype</span><span class="p">,</span> <span class="n">else_rtype</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">test</span><span class="p">,</span> <span class="n">nodes</span><span class="o">.</span><span class="n">Test</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">test</span><span class="o">.</span><span class="n">node</span><span class="p">,</span> <span class="n">nodes</span><span class="o">.</span><span class="n">Name</span><span class="p">)</span> <span class="ow">and</span>
+            <span class="n">ast</span><span class="o">.</span><span class="n">test</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s">&#39;defined&#39;</span><span class="p">,</span> <span class="s">&#39;undefined&#39;</span><span class="p">)):</span>
+        <span class="n">struct</span><span class="p">[</span><span class="n">ast</span><span class="o">.</span><span class="n">test</span><span class="o">.</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">may_be_defined</span> <span class="o">=</span> <span class="bp">True</span>
+    <span class="k">return</span> <span class="n">rtype</span><span class="p">,</span> <span class="n">struct</span>
+
+
+<span class="nd">@visits_expr</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">Call</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">visit_call</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="p">,</span> <span class="n">nodes</span><span class="o">.</span><span class="n">Name</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s">&#39;range&#39;</span><span class="p">:</span>
+            <span class="n">ctx</span><span class="o">.</span><span class="n">meet</span><span class="p">(</span><span class="n">List</span><span class="p">(</span><span class="n">Unknown</span><span class="p">()),</span> <span class="n">ast</span><span class="p">)</span>
+            <span class="n">struct</span> <span class="o">=</span> <span class="n">Dictionary</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">ast</span><span class="o">.</span><span class="n">args</span><span class="p">:</span>
+                <span class="n">arg_rtype</span><span class="p">,</span> <span class="n">arg_struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">Context</span><span class="p">(</span><span class="n">predicted_struct</span><span class="o">=</span><span class="n">Scalar</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">arg</span><span class="p">)))</span>
+                <span class="n">struct</span> <span class="o">=</span> <span class="n">merge</span><span class="p">(</span><span class="n">struct</span><span class="p">,</span> <span class="n">arg_struct</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">List</span><span class="p">(</span><span class="n">Scalar</span><span class="p">()),</span> <span class="n">struct</span>
+        <span class="k">elif</span> <span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s">&#39;lipsum&#39;</span><span class="p">:</span>
+            <span class="n">ctx</span><span class="o">.</span><span class="n">meet</span><span class="p">(</span><span class="n">Scalar</span><span class="p">(),</span> <span class="n">ast</span><span class="p">)</span>
+            <span class="n">struct</span> <span class="o">=</span> <span class="n">Dictionary</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">ast</span><span class="o">.</span><span class="n">args</span><span class="p">:</span>
+                <span class="n">arg_rtype</span><span class="p">,</span> <span class="n">arg_struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">Context</span><span class="p">(</span><span class="n">predicted_struct</span><span class="o">=</span><span class="n">Scalar</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">arg</span><span class="p">)))</span>
+                <span class="n">struct</span> <span class="o">=</span> <span class="n">merge</span><span class="p">(</span><span class="n">struct</span><span class="p">,</span> <span class="n">arg_struct</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">kwarg</span> <span class="ow">in</span> <span class="n">ast</span><span class="o">.</span><span class="n">kwargs</span><span class="p">:</span>
+                <span class="n">arg_rtype</span><span class="p">,</span> <span class="n">arg_struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">kwarg</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">Context</span><span class="p">(</span><span class="n">predicted_struct</span><span class="o">=</span><span class="n">Scalar</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">kwarg</span><span class="p">)))</span>
+                <span class="n">struct</span> <span class="o">=</span> <span class="n">merge</span><span class="p">(</span><span class="n">struct</span><span class="p">,</span> <span class="n">arg_struct</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">Scalar</span><span class="p">(),</span> <span class="n">struct</span>
+        <span class="k">elif</span> <span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s">&#39;dict&#39;</span><span class="p">:</span>
+            <span class="n">ctx</span><span class="o">.</span><span class="n">meet</span><span class="p">(</span><span class="n">Dictionary</span><span class="p">(),</span> <span class="n">ast</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">ast</span><span class="o">.</span><span class="n">args</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">InvalidExpression</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="s">&#39;dict accepts only keyword arguments&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">_visit_dict</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="p">[(</span><span class="n">kwarg</span><span class="o">.</span><span class="n">key</span><span class="p">,</span> <span class="n">kwarg</span><span class="o">.</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">kwarg</span> <span class="ow">in</span> <span class="n">ast</span><span class="o">.</span><span class="n">kwargs</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">InvalidExpression</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="s">&#39;&quot;{}&quot; call is not supported yet&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">))</span>
+
+
+<span class="nd">@visits_expr</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">Filter</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">visit_filter</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">ast</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s">&#39;abs&#39;</span><span class="p">,</span> <span class="s">&#39;striptags&#39;</span><span class="p">,</span> <span class="s">&#39;capitalize&#39;</span><span class="p">,</span> <span class="s">&#39;center&#39;</span><span class="p">,</span> <span class="s">&#39;escape&#39;</span><span class="p">,</span> <span class="s">&#39;filesizeformat&#39;</span><span class="p">,</span>
+                    <span class="s">&#39;float&#39;</span><span class="p">,</span> <span class="s">&#39;forceescape&#39;</span><span class="p">,</span> <span class="s">&#39;format&#39;</span><span class="p">,</span> <span class="s">&#39;indent&#39;</span><span class="p">,</span> <span class="s">&#39;int&#39;</span><span class="p">,</span> <span class="s">&#39;replace&#39;</span><span class="p">,</span> <span class="s">&#39;round&#39;</span><span class="p">,</span>
+                    <span class="s">&#39;safe&#39;</span><span class="p">,</span> <span class="s">&#39;string&#39;</span><span class="p">,</span> <span class="s">&#39;striptags&#39;</span><span class="p">,</span> <span class="s">&#39;title&#39;</span><span class="p">,</span> <span class="s">&#39;trim&#39;</span><span class="p">,</span> <span class="s">&#39;truncate&#39;</span><span class="p">,</span> <span class="s">&#39;upper&#39;</span><span class="p">,</span>
+                    <span class="s">&#39;urlencode&#39;</span><span class="p">,</span> <span class="s">&#39;urlize&#39;</span><span class="p">,</span> <span class="s">&#39;wordcount&#39;</span><span class="p">,</span> <span class="s">&#39;wordwrap&#39;</span><span class="p">,</span> <span class="s">&#39;e&#39;</span><span class="p">):</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">meet</span><span class="p">(</span><span class="n">Scalar</span><span class="p">(),</span> <span class="n">ast</span><span class="p">)</span>
+        <span class="n">node_struct</span> <span class="o">=</span> <span class="n">Scalar</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">ast</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s">&#39;batch&#39;</span><span class="p">,</span> <span class="s">&#39;slice&#39;</span><span class="p">):</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">meet</span><span class="p">(</span><span class="n">List</span><span class="p">(</span><span class="n">List</span><span class="p">(</span><span class="n">Unknown</span><span class="p">())),</span> <span class="n">ast</span><span class="p">)</span>
+        <span class="n">node_struct</span> <span class="o">=</span> <span class="n">merge</span><span class="p">(</span>
+            <span class="n">List</span><span class="p">(</span><span class="n">List</span><span class="p">(</span><span class="n">Unknown</span><span class="p">(),</span> <span class="n">linenos</span><span class="o">=</span><span class="p">[</span><span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="o">.</span><span class="n">lineno</span><span class="p">]),</span> <span class="n">linenos</span><span class="o">=</span><span class="p">[</span><span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="o">.</span><span class="n">lineno</span><span class="p">]),</span>
+            <span class="n">ctx</span><span class="o">.</span><span class="n">get_predicted_struct</span><span class="p">()</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">item</span>
+    <span class="k">elif</span> <span class="n">ast</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s">&#39;default&#39;</span><span class="p">:</span>
+        <span class="n">default_value_rtype</span><span class="p">,</span> <span class="n">default_value_struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span>
+            <span class="n">ast</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">Context</span><span class="p">(</span><span class="n">predicted_struct</span><span class="o">=</span><span class="n">Unknown</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])))</span>
+        <span class="n">node_struct</span> <span class="o">=</span> <span class="n">merge</span><span class="p">(</span>
+            <span class="n">ctx</span><span class="o">.</span><span class="n">get_predicted_struct</span><span class="p">(),</span>
+            <span class="n">default_value_rtype</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">node_struct</span><span class="o">.</span><span class="n">used_with_default</span> <span class="o">=</span> <span class="bp">True</span>
+    <span class="k">elif</span> <span class="n">ast</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s">&#39;dictsort&#39;</span><span class="p">:</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">meet</span><span class="p">(</span><span class="n">List</span><span class="p">(</span><span class="n">Tuple</span><span class="p">([</span><span class="n">Scalar</span><span class="p">(),</span> <span class="n">Unknown</span><span class="p">()])),</span> <span class="n">ast</span><span class="p">)</span>
+        <span class="n">node_struct</span> <span class="o">=</span> <span class="n">Dictionary</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">ast</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s">&#39;join&#39;</span><span class="p">:</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">meet</span><span class="p">(</span><span class="n">Scalar</span><span class="p">(),</span> <span class="n">ast</span><span class="p">)</span>
+        <span class="n">node_struct</span> <span class="o">=</span> <span class="n">List</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="p">,</span> <span class="n">Scalar</span><span class="p">())</span>
+        <span class="n">rtype</span><span class="p">,</span> <span class="n">struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="p">,</span> <span class="n">Context</span><span class="p">(</span>
+            <span class="n">return_struct_cls</span><span class="o">=</span><span class="n">ctx</span><span class="o">.</span><span class="n">return_struct_cls</span><span class="p">,</span>
+            <span class="n">predicted_struct</span><span class="o">=</span><span class="n">node_struct</span>
+        <span class="p">))</span>
+        <span class="n">arg_rtype</span><span class="p">,</span> <span class="n">arg_struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">Context</span><span class="p">(</span><span class="n">predicted_struct</span><span class="o">=</span><span class="n">Scalar</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])))</span>
+        <span class="k">return</span> <span class="n">rtype</span><span class="p">,</span> <span class="n">merge</span><span class="p">(</span><span class="n">struct</span><span class="p">,</span> <span class="n">arg_struct</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">ast</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s">&#39;first&#39;</span><span class="p">,</span> <span class="s">&#39;last&#39;</span><span class="p">,</span> <span class="s">&#39;random&#39;</span><span class="p">,</span> <span class="s">&#39;length&#39;</span><span class="p">,</span> <span class="s">&#39;sum&#39;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">ast</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s">&#39;first&#39;</span><span class="p">,</span> <span class="s">&#39;last&#39;</span><span class="p">,</span> <span class="s">&#39;random&#39;</span><span class="p">):</span>
+            <span class="n">el_struct</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">get_predicted_struct</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">ast</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s">&#39;length&#39;</span><span class="p">:</span>
+            <span class="n">ctx</span><span class="o">.</span><span class="n">meet</span><span class="p">(</span><span class="n">Scalar</span><span class="p">(),</span> <span class="n">ast</span><span class="p">)</span>
+            <span class="n">el_struct</span> <span class="o">=</span> <span class="n">Unknown</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">ctx</span><span class="o">.</span><span class="n">meet</span><span class="p">(</span><span class="n">Scalar</span><span class="p">(),</span> <span class="n">ast</span><span class="p">)</span>
+            <span class="n">el_struct</span> <span class="o">=</span> <span class="n">Scalar</span><span class="p">()</span>
+        <span class="n">node_struct</span> <span class="o">=</span> <span class="n">List</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="p">,</span> <span class="n">el_struct</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">ast</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s">&#39;groupby&#39;</span><span class="p">,</span> <span class="s">&#39;map&#39;</span><span class="p">,</span> <span class="s">&#39;reject&#39;</span><span class="p">,</span> <span class="s">&#39;rejectattr&#39;</span><span class="p">,</span> <span class="s">&#39;select&#39;</span><span class="p">,</span> <span class="s">&#39;selectattr&#39;</span><span class="p">,</span> <span class="s">&#39;sort&#39;</span><span class="p">):</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">meet</span><span class="p">(</span><span class="n">List</span><span class="p">(</span><span class="n">Unknown</span><span class="p">()),</span> <span class="n">ast</span><span class="p">)</span>
+        <span class="n">node_struct</span> <span class="o">=</span> <span class="n">merge</span><span class="p">(</span>
+            <span class="n">List</span><span class="p">(</span><span class="n">Unknown</span><span class="p">()),</span>
+            <span class="n">ctx</span><span class="o">.</span><span class="n">get_predicted_struct</span><span class="p">()</span>
+        <span class="p">)</span>
+    <span class="k">elif</span> <span class="n">ast</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s">&#39;list&#39;</span><span class="p">:</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">meet</span><span class="p">(</span><span class="n">List</span><span class="p">(</span><span class="n">Scalar</span><span class="p">()),</span> <span class="n">ast</span><span class="p">)</span>
+        <span class="n">node_struct</span> <span class="o">=</span> <span class="n">merge</span><span class="p">(</span>
+            <span class="n">List</span><span class="p">(</span><span class="n">Scalar</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="p">)),</span>
+            <span class="n">ctx</span><span class="o">.</span><span class="n">get_predicted_struct</span><span class="p">()</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">item</span>
+    <span class="k">elif</span> <span class="n">ast</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s">&#39;pprint&#39;</span><span class="p">:</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">meet</span><span class="p">(</span><span class="n">Scalar</span><span class="p">(),</span> <span class="n">ast</span><span class="p">)</span>
+        <span class="n">node_struct</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">get_predicted_struct</span><span class="p">()</span>
+    <span class="k">elif</span> <span class="n">ast</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s">&#39;xmlattr&#39;</span><span class="p">:</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">meet</span><span class="p">(</span><span class="n">Scalar</span><span class="p">(),</span> <span class="n">ast</span><span class="p">)</span>
+        <span class="n">node_struct</span> <span class="o">=</span> <span class="n">Dictionary</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">ast</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s">&#39;attr&#39;</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">InvalidExpression</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="s">&#39;attr filter is not supported&#39;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">InvalidExpression</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="s">&#39;unknown filter&#39;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="p">,</span> <span class="n">Context</span><span class="p">(</span>
+        <span class="n">return_struct_cls</span><span class="o">=</span><span class="n">ctx</span><span class="o">.</span><span class="n">return_struct_cls</span><span class="p">,</span>
+        <span class="n">predicted_struct</span><span class="o">=</span><span class="n">node_struct</span>
+    <span class="p">))</span>
+
+
+<span class="c"># :class:`nodes.Literal` visitors</span>
+
+<span class="nd">@visits_expr</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">TemplateData</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">visit_template_data</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">Scalar</span><span class="p">(),</span> <span class="n">Dictionary</span><span class="p">()</span>
+
+
+<span class="nd">@visits_expr</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">Const</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">visit_const</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span>
+    <span class="n">ctx</span><span class="o">.</span><span class="n">meet</span><span class="p">(</span><span class="n">Scalar</span><span class="p">(),</span> <span class="n">ast</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">Scalar</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">constant</span><span class="o">=</span><span class="bp">True</span><span class="p">),</span> <span class="n">Dictionary</span><span class="p">()</span>
+
+
+<span class="nd">@visits_expr</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">Tuple</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">visit_tuple</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span>
+    <span class="n">ctx</span><span class="o">.</span><span class="n">meet</span><span class="p">(</span><span class="n">Tuple</span><span class="p">(</span><span class="bp">None</span><span class="p">),</span> <span class="n">ast</span><span class="p">)</span>
+
+    <span class="n">struct</span> <span class="o">=</span> <span class="n">Dictionary</span><span class="p">()</span>
+    <span class="n">item_structs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">ast</span><span class="o">.</span><span class="n">items</span><span class="p">:</span>
+        <span class="n">item_rtype</span><span class="p">,</span> <span class="n">item_struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">ctx</span><span class="p">)</span>
+        <span class="n">item_structs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item_rtype</span><span class="p">)</span>
+        <span class="n">struct</span> <span class="o">=</span> <span class="n">merge</span><span class="p">(</span><span class="n">struct</span><span class="p">,</span> <span class="n">item_struct</span><span class="p">)</span>
+    <span class="n">rtype</span> <span class="o">=</span> <span class="n">Tuple</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">item_structs</span><span class="p">,</span> <span class="n">constant</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">rtype</span><span class="p">,</span> <span class="n">struct</span>
+
+
+<span class="nd">@visits_expr</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">List</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">visit_list</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span>
+    <span class="n">ctx</span><span class="o">.</span><span class="n">meet</span><span class="p">(</span><span class="n">List</span><span class="p">(</span><span class="n">Unknown</span><span class="p">()),</span> <span class="n">ast</span><span class="p">)</span>
+    <span class="n">struct</span> <span class="o">=</span> <span class="n">Dictionary</span><span class="p">()</span>
+
+    <span class="n">predicted_struct</span> <span class="o">=</span> <span class="n">merge</span><span class="p">(</span><span class="n">List</span><span class="p">(</span><span class="n">Unknown</span><span class="p">()),</span> <span class="n">ctx</span><span class="o">.</span><span class="n">get_predicted_struct</span><span class="p">())</span><span class="o">.</span><span class="n">item</span>
+    <span class="n">el_rtype</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">ast</span><span class="o">.</span><span class="n">items</span><span class="p">:</span>
+        <span class="n">item_rtype</span><span class="p">,</span> <span class="n">item_struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">Context</span><span class="p">(</span><span class="n">predicted_struct</span><span class="o">=</span><span class="n">predicted_struct</span><span class="p">))</span>
+        <span class="n">struct</span> <span class="o">=</span> <span class="n">merge</span><span class="p">(</span><span class="n">struct</span><span class="p">,</span> <span class="n">item_struct</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">el_rtype</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">el_rtype</span> <span class="o">=</span> <span class="n">item_rtype</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">el_rtype</span> <span class="o">=</span> <span class="n">merge_rtypes</span><span class="p">(</span><span class="n">el_rtype</span><span class="p">,</span> <span class="n">item_rtype</span><span class="p">)</span>
+    <span class="n">rtype</span> <span class="o">=</span> <span class="n">List</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">el_rtype</span> <span class="ow">or</span> <span class="n">Unknown</span><span class="p">(),</span> <span class="n">constant</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">rtype</span><span class="p">,</span> <span class="n">struct</span>
+
+
+<span class="k">def</span> <span class="nf">_visit_dict</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">items</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;A common logic behind nodes.Dict and nodes.Call (``{{ dict(a=1) }}``)</span>
+<span class="sd">    visitors.</span>
+
+<span class="sd">    :param items: a list of (key, value); key may be either ast or string</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">ctx</span><span class="o">.</span><span class="n">meet</span><span class="p">(</span><span class="n">Dictionary</span><span class="p">(),</span> <span class="n">ast</span><span class="p">)</span>
+    <span class="n">rtype</span> <span class="o">=</span> <span class="n">Dictionary</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">constant</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+    <span class="n">struct</span> <span class="o">=</span> <span class="n">Dictionary</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">items</span><span class="p">:</span>
+        <span class="n">value_rtype</span><span class="p">,</span> <span class="n">value_struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Context</span><span class="p">(</span>
+            <span class="n">predicted_struct</span><span class="o">=</span><span class="n">Unknown</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">value</span><span class="p">)))</span>
+        <span class="n">struct</span> <span class="o">=</span> <span class="n">merge</span><span class="p">(</span><span class="n">struct</span><span class="p">,</span> <span class="n">value_struct</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">nodes</span><span class="o">.</span><span class="n">Node</span><span class="p">):</span>
+            <span class="n">key_rtype</span><span class="p">,</span> <span class="n">key_struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">Context</span><span class="p">(</span><span class="n">predicted_struct</span><span class="o">=</span><span class="n">Scalar</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">key</span><span class="p">)))</span>
+            <span class="n">struct</span> <span class="o">=</span> <span class="n">merge</span><span class="p">(</span><span class="n">struct</span><span class="p">,</span> <span class="n">key_struct</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">nodes</span><span class="o">.</span><span class="n">Const</span><span class="p">):</span>
+                <span class="n">rtype</span><span class="p">[</span><span class="n">key</span><span class="o">.</span><span class="n">value</span><span class="p">]</span> <span class="o">=</span> <span class="n">value_rtype</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="nb">basestring</span><span class="p">):</span>
+            <span class="n">rtype</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value_rtype</span>
+    <span class="k">return</span> <span class="n">rtype</span><span class="p">,</span> <span class="n">struct</span>
+
+
+<span class="nd">@visits_expr</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">Dict</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">visit_dict</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span>
+    <span class="n">ctx</span><span class="o">.</span><span class="n">meet</span><span class="p">(</span><span class="n">Dictionary</span><span class="p">(),</span> <span class="n">ast</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_visit_dict</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="p">[(</span><span class="n">item</span><span class="o">.</span><span class="n">key</span><span class="p">,</span> <span class="n">item</span><span class="o">.</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">ast</span><span class="o">.</span><span class="n">items</span><span class="p">])</span>
+
+
+<span class="c"># Statement visitors</span>
+
+<span class="nd">@visits_stmt</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">For</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">visit_for</span><span class="p">(</span><span class="n">ast</span><span class="p">):</span>
+    <span class="n">body_struct</span> <span class="o">=</span> <span class="n">visit_nodes_and_merge</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">body</span><span class="p">,</span> <span class="n">Scalar</span><span class="p">)</span>
+    <span class="n">else_struct</span> <span class="o">=</span> <span class="n">visit_nodes_and_merge</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">else_</span><span class="p">,</span> <span class="n">Scalar</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="s">&#39;loop&#39;</span> <span class="ow">in</span> <span class="n">body_struct</span><span class="p">:</span>
+        <span class="c"># exclude a special `loop` variable from the body structure</span>
+        <span class="k">del</span> <span class="n">body_struct</span><span class="p">[</span><span class="s">&#39;loop&#39;</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">target</span><span class="p">,</span> <span class="n">nodes</span><span class="o">.</span><span class="n">Tuple</span><span class="p">):</span>
+        <span class="n">target_struct</span> <span class="o">=</span> <span class="n">Tuple</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span>
+            <span class="n">ast</span><span class="o">.</span><span class="n">target</span><span class="p">,</span>
+            <span class="p">[</span><span class="n">body_struct</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">Unknown</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">target</span><span class="p">))</span>
+             <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">ast</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">items</span><span class="p">])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">target_struct</span> <span class="o">=</span> <span class="n">body_struct</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">Unknown</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">ast</span><span class="p">))</span>
+
+    <span class="n">iter_rtype</span><span class="p">,</span> <span class="n">iter_struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span>
+        <span class="n">ast</span><span class="o">.</span><span class="n">iter</span><span class="p">,</span>
+        <span class="n">Context</span><span class="p">(</span>
+            <span class="n">return_struct_cls</span><span class="o">=</span><span class="n">Unknown</span><span class="p">,</span>
+            <span class="n">predicted_struct</span><span class="o">=</span><span class="n">List</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">target_struct</span><span class="p">)))</span>
+
+    <span class="n">merge</span><span class="p">(</span><span class="n">iter_rtype</span><span class="p">,</span> <span class="n">List</span><span class="p">(</span><span class="n">target_struct</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">merge</span><span class="p">(</span><span class="n">merge</span><span class="p">(</span><span class="n">iter_struct</span><span class="p">,</span> <span class="n">body_struct</span><span class="p">),</span> <span class="n">else_struct</span><span class="p">)</span>
+
+
+<span class="nd">@visits_stmt</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">If</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">visit_if</span><span class="p">(</span><span class="n">ast</span><span class="p">):</span>
+    <span class="n">test_rtype</span><span class="p">,</span> <span class="n">test_struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">test</span><span class="p">,</span> <span class="n">Context</span><span class="p">(</span>
+        <span class="n">return_struct_cls</span><span class="o">=</span><span class="n">Unknown</span><span class="p">,</span>
+        <span class="n">predicted_struct</span><span class="o">=</span><span class="n">Unknown</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">test</span><span class="p">)))</span>
+    <span class="n">if_struct</span> <span class="o">=</span> <span class="n">visit_nodes_and_merge</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">body</span><span class="p">,</span> <span class="n">Scalar</span><span class="p">)</span>
+    <span class="n">else_struct</span> <span class="o">=</span> <span class="n">visit_nodes_and_merge</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">else_</span><span class="p">,</span> <span class="n">Scalar</span><span class="p">)</span> <span class="k">if</span> <span class="n">ast</span><span class="o">.</span><span class="n">else_</span> <span class="k">else</span> <span class="n">Dictionary</span><span class="p">()</span>
+    <span class="n">struct</span> <span class="o">=</span> <span class="n">merge</span><span class="p">(</span><span class="n">merge</span><span class="p">(</span><span class="n">test_struct</span><span class="p">,</span> <span class="n">if_struct</span><span class="p">),</span> <span class="n">else_struct</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">test</span><span class="p">,</span> <span class="n">nodes</span><span class="o">.</span><span class="n">Test</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">test</span><span class="o">.</span><span class="n">node</span><span class="p">,</span> <span class="n">nodes</span><span class="o">.</span><span class="n">Name</span><span class="p">):</span>
+        <span class="n">lookup_struct</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="k">if</span> <span class="n">ast</span><span class="o">.</span><span class="n">test</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s">&#39;undefined&#39;</span><span class="p">:</span>
+            <span class="n">lookup_struct</span> <span class="o">=</span> <span class="n">if_struct</span>
+        <span class="k">if</span> <span class="n">ast</span><span class="o">.</span><span class="n">test</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s">&#39;defined&#39;</span><span class="p">:</span>
+            <span class="n">lookup_struct</span> <span class="o">=</span> <span class="n">else_struct</span>
+        <span class="n">var_name</span> <span class="o">=</span> <span class="n">ast</span><span class="o">.</span><span class="n">test</span><span class="o">.</span><span class="n">node</span><span class="o">.</span><span class="n">name</span>
+        <span class="k">if</span> <span class="n">lookup_struct</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">var_name</span> <span class="ow">in</span> <span class="n">lookup_struct</span><span class="p">:</span>
+            <span class="n">struct</span><span class="p">[</span><span class="n">var_name</span><span class="p">]</span><span class="o">.</span><span class="n">may_be_defined</span> <span class="o">=</span> <span class="bp">True</span>
+    <span class="k">return</span> <span class="n">struct</span>
+
+
+<span class="nd">@visits_stmt</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">Assign</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">visit_assign</span><span class="p">(</span><span class="n">ast</span><span class="p">):</span>
+    <span class="n">struct</span> <span class="o">=</span> <span class="n">Dictionary</span><span class="p">()</span>
+    <span class="k">if</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">target</span><span class="p">,</span> <span class="n">nodes</span><span class="o">.</span><span class="n">Name</span><span class="p">)</span> <span class="ow">or</span>
+            <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">target</span><span class="p">,</span> <span class="n">nodes</span><span class="o">.</span><span class="n">Tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="p">,</span> <span class="n">nodes</span><span class="o">.</span><span class="n">Tuple</span><span class="p">))):</span>
+        <span class="n">variables</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">target</span><span class="p">,</span> <span class="n">nodes</span><span class="o">.</span><span class="n">Tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="p">,</span> <span class="n">nodes</span><span class="o">.</span><span class="n">Tuple</span><span class="p">)):</span>
+            <span class="n">variables</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">ast</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">items</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="o">.</span><span class="n">items</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="n">InvalidExpression</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="s">&#39;number of items in left side is different &#39;</span>
+                                             <span class="s">&#39;from right side&#39;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">name_ast</span><span class="p">,</span> <span class="n">var_ast</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">izip</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">items</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="o">.</span><span class="n">items</span><span class="p">):</span>
+                <span class="n">variables</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">name_ast</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">var_ast</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">var_name</span><span class="p">,</span> <span class="n">var_ast</span> <span class="ow">in</span> <span class="n">variables</span><span class="p">:</span>
+            <span class="n">var_rtype</span><span class="p">,</span> <span class="n">var_struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">var_ast</span><span class="p">,</span> <span class="n">Context</span><span class="p">(</span><span class="n">predicted_struct</span><span class="o">=</span><span class="n">Unknown</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">var_ast</span><span class="p">)))</span>
+            <span class="n">var_rtype</span><span class="o">.</span><span class="n">constant</span> <span class="o">=</span> <span class="bp">True</span>
+            <span class="n">var_rtype</span><span class="o">.</span><span class="n">label</span> <span class="o">=</span> <span class="n">var_name</span>
+            <span class="n">struct</span> <span class="o">=</span> <span class="n">merge</span><span class="p">(</span><span class="n">merge</span><span class="p">(</span><span class="n">struct</span><span class="p">,</span> <span class="n">var_struct</span><span class="p">),</span> <span class="n">Dictionary</span><span class="p">({</span>
+                <span class="n">var_name</span><span class="p">:</span> <span class="n">var_rtype</span><span class="p">,</span>
+            <span class="p">}))</span>
+        <span class="k">return</span> <span class="n">struct</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">target</span><span class="p">,</span> <span class="n">nodes</span><span class="o">.</span><span class="n">Tuple</span><span class="p">):</span>
+        <span class="n">tuple_items</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">name_ast</span> <span class="ow">in</span> <span class="n">ast</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">items</span><span class="p">:</span>
+            <span class="n">var_struct</span> <span class="o">=</span> <span class="n">Unknown</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">name_ast</span><span class="p">,</span> <span class="n">constant</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+            <span class="n">tuple_items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">var_struct</span><span class="p">)</span>
+            <span class="n">struct</span> <span class="o">=</span> <span class="n">merge</span><span class="p">(</span><span class="n">struct</span><span class="p">,</span> <span class="n">Dictionary</span><span class="p">({</span><span class="n">name_ast</span><span class="o">.</span><span class="n">name</span><span class="p">:</span> <span class="n">var_struct</span><span class="p">}))</span>
+        <span class="n">var_rtype</span><span class="p">,</span> <span class="n">var_struct</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span>
+            <span class="n">ast</span><span class="o">.</span><span class="n">node</span><span class="p">,</span> <span class="n">Context</span><span class="p">(</span><span class="n">return_struct_cls</span><span class="o">=</span><span class="n">Unknown</span><span class="p">,</span> <span class="n">predicted_struct</span><span class="o">=</span><span class="n">Tuple</span><span class="p">(</span><span class="n">tuple_items</span><span class="p">)))</span>
+        <span class="k">return</span> <span class="n">merge</span><span class="p">(</span><span class="n">struct</span><span class="p">,</span> <span class="n">var_struct</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">InvalidExpression</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="s">&#39;unsupported assignment&#39;</span><span class="p">)</span>
+
+
+<span class="nd">@visits_stmt</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">Output</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">visit_output</span><span class="p">(</span><span class="n">ast</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">visit_nodes_and_merge</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">nodes</span><span class="p">,</span> <span class="n">Scalar</span><span class="p">)</span>
+
+
+<span class="nd">@visits_stmt</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">Template</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">visit_template</span><span class="p">(</span><span class="n">ast</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">visit_nodes_and_merge</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">body</span><span class="p">,</span> <span class="n">Scalar</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">visit_nodes_and_merge</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">predicted_struct_class</span><span class="p">):</span>
+    <span class="n">rv</span> <span class="o">=</span> <span class="n">Dictionary</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">nodes</span><span class="p">:</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="n">merge</span><span class="p">(</span><span class="n">rv</span><span class="p">,</span> <span class="n">visit</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">Context</span><span class="p">(</span>
+            <span class="n">return_struct_cls</span><span class="o">=</span><span class="n">Scalar</span><span class="p">,</span>
+            <span class="n">predicted_struct</span><span class="o">=</span><span class="n">predicted_struct_class</span><span class="o">.</span><span class="n">from_ast</span><span class="p">(</span><span class="n">node</span><span class="p">))))</span>
+    <span class="k">return</span> <span class="n">rv</span>
+
+
+<span class="k">def</span> <span class="nf">visit_stmt</span><span class="p">(</span><span class="n">ast</span><span class="p">):</span>
+    <span class="n">visitor</span> <span class="o">=</span> <span class="n">stmt_visitors</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">ast</span><span class="p">))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">visitor</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">node_cls</span><span class="p">,</span> <span class="n">visitor_</span> <span class="ow">in</span> <span class="n">stmt_visitors</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">node_cls</span><span class="p">):</span>
+                <span class="n">visitor</span> <span class="o">=</span> <span class="n">visitor_</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">visitor</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s">&#39;stmt visitor for {} is not found&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">ast</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="n">visitor</span><span class="p">(</span><span class="n">ast</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">visit_expr</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span>
+    <span class="n">visitor</span> <span class="o">=</span> <span class="n">expr_visitors</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">ast</span><span class="p">))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">visitor</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">node_cls</span><span class="p">,</span> <span class="n">visitor_</span> <span class="ow">in</span> <span class="n">expr_visitors</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">node_cls</span><span class="p">):</span>
+                <span class="n">visitor</span> <span class="o">=</span> <span class="n">visitor_</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">visitor</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s">&#39;expr visitor for {} is not found&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">ast</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="n">visitor</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">visit</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">nodes</span><span class="o">.</span><span class="n">Stmt</span><span class="p">):</span>
+        <span class="n">structure</span> <span class="o">=</span> <span class="n">visit_stmt</span><span class="p">(</span><span class="n">ast</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">nodes</span><span class="o">.</span><span class="n">Expr</span><span class="p">):</span>
+        <span class="n">rtype</span><span class="p">,</span> <span class="n">structure</span> <span class="o">=</span> <span class="n">visit_expr</span><span class="p">(</span><span class="n">ast</span><span class="p">,</span> <span class="n">ctx</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">structure</span>
+
+
+<span class="k">def</span> <span class="nf">_post_process</span><span class="p">(</span><span class="n">struct</span><span class="p">):</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">struct</span><span class="p">,</span> <span class="n">Dictionary</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">struct</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">v</span><span class="o">.</span><span class="n">constant</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">v</span><span class="o">.</span><span class="n">may_be_defined</span><span class="p">:</span>
+                <span class="k">del</span> <span class="n">struct</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">_post_process</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">struct</span>
+
+
+<div class="viewcode-block" id="infer_from_ast"><a class="viewcode-back" href="../../api.html#jinja2schema.core.infer_from_ast">[docs]</a><span class="k">def</span> <span class="nf">infer_from_ast</span><span class="p">(</span><span class="n">ast</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    :type ast: :class:`nodes.Template`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">rv</span> <span class="o">=</span> <span class="n">visit_nodes_and_merge</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">body</span><span class="p">,</span> <span class="n">Scalar</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_post_process</span><span class="p">(</span><span class="n">rv</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="parse"><a class="viewcode-back" href="../../api.html#jinja2schema.core.parse">[docs]</a><span class="k">def</span> <span class="nf">parse</span><span class="p">(</span><span class="n">template</span><span class="p">,</span> <span class="n">jinja2_env</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    :type template: basestring</span>
+<span class="sd">    :type jinja2_env: :class:`jinja2.Environment`</span>
+<span class="sd">    :rtype: :class:`nodes.Template`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">jinja2_env</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">jinja2_env</span> <span class="o">=</span> <span class="n">jinja2</span><span class="o">.</span><span class="n">Environment</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">jinja2_env</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">template</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="infer"><a class="viewcode-back" href="../../api.html#jinja2schema.core.infer">[docs]</a><span class="k">def</span> <span class="nf">infer</span><span class="p">(</span><span class="n">template</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Returns a :class:`Dictionary` that describes a structure of a context required by ``template``.</span>
+
+<span class="sd">    :type template: basestring</span>
+<span class="sd">    :rtype: class:`Dictionary`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">infer_from_ast</span><span class="p">(</span><span class="n">parse</span><span class="p">(</span><span class="n">template</span><span class="p">))</span></div>
+</pre></div>
+
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2014, Anton Romanovich.
+    </p>
+  </div>
+
+  <a href="https://github.com/snide/sphinx_rtd_theme">Sphinx theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'0.0.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

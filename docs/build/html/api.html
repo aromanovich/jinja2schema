@@ -1,0 +1,382 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Internals &mdash; jinja2schema 0.0.1 documentation</title>
+  
+
+  
+  
+
+  
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+    <link rel="top" title="jinja2schema 0.0.1 documentation" href="index.html"/>
+        <link rel="prev" title="jinja2schema" href="index.html"/> 
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-nav-search">
+        <a href="index.html" class="fa fa-home"> jinja2schema</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+        
+        
+            <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="">Internals</a></li>
+</ul>
+<ul class="simple">
+</ul>
+<ul class="simple">
+</ul>
+
+        
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="index.html">jinja2schema</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html">Docs</a> &raquo;</li>
+      
+    <li>Internals</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          <a href="_sources/api.txt" rel="nofollow"> View page source</a>
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            
+  <div class="section" id="module-jinja2schema.core">
+<span id="internals"></span><h1>Internals<a class="headerlink" href="#module-jinja2schema.core" title="Permalink to this headline">¶</a></h1>
+<p>There are two types of visitors, expression and statement.</p>
+<p>Expression visitors return tuple which contains expression type and expression structure.</p>
+<p>Statement visitors return <tt class="xref py py-class docutils literal"><span class="pre">models.Dictionary</span></tt> which contains
+structures of variables used within the statement.</p>
+<dl class="class">
+<dt id="jinja2schema.core.Context">
+<em class="property">class </em><tt class="descclassname">jinja2schema.core.</tt><tt class="descname">Context</tt><big>(</big><em>return_struct_cls=None</em>, <em>predicted_struct=None</em><big>)</big><a class="reference internal" href="_modules/jinja2schema/core.html#Context"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jinja2schema.core.Context" title="Permalink to this definition">¶</a></dt>
+<dd><p>Context is used when parsing expressions.</p>
+<p>Suppose there is an expression:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="p">{{</span> <span class="n">data</span><span class="o">.</span><span class="n">field</span><span class="o">.</span><span class="n">subfield</span> <span class="p">}}</span>
+</pre></div>
+</div>
+<p>It has the following AST:</p>
+<div class="highlight-python"><div class="highlight"><pre>Getattr(
+    node=Getattr(
+        node=Name(name=&#39;data&#39;)
+        attr=&#39;field&#39;
+    ),
+    attr=&#39;subfield&#39;
+)
+</pre></div>
+</div>
+<p><tt class="xref py py-func docutils literal"><span class="pre">visit_getattr()</span></tt> returns a pair that looks like this:</p>
+<div class="highlight-python"><div class="highlight"><pre>(
+    # return type:
+    Scalar(...),
+    # structure:
+    {
+        &#39;data: {
+            &#39;field&#39;: {
+                &#39;subfield&#39;: Scalar(...)
+            }
+        }
+    }
+}
+</pre></div>
+</div>
+<p>The return type is defined by the outermost <tt class="xref py py-class docutils literal"><span class="pre">nodes.Getattr</span></tt> node, which
+in this case is being printed.
+The structure is build during AST traversal from outer to inners nodes and it is
+kind of &#8220;reversed&#8221; in relation to the AST.
+<a class="reference internal" href="#jinja2schema.core.Context" title="jinja2schema.core.Context"><tt class="xref py py-class docutils literal"><span class="pre">Context</span></tt></a> is intended for:</p>
+<ul class="simple">
+<li>capturing a return type and passing it to the innermost expression node;</li>
+<li>passing a structure &#8220;under construction&#8221; to the visitors of nested nodes.</li>
+</ul>
+<p>Let&#8217;s look through an example.</p>
+<p>Suppose <tt class="xref py py-func docutils literal"><span class="pre">visit_getattr()</span></tt> is called with the following arguments:</p>
+<div class="highlight-python"><div class="highlight"><pre>ast = Getattr(node=Getattr(node=Name(name=&#39;data&#39;), attr=&#39;field&#39;), attr=&#39;subfield&#39;))
+context = Context(return_struct_cls=Scalar, predicted_struct=Scalar())
+</pre></div>
+</div>
+<p>It looks to the outermost AST node and based on it&#8217;s type (which is <tt class="xref py py-class docutils literal"><span class="pre">nodes.Getattr</span></tt>)
+and it&#8217;s <tt class="docutils literal"><span class="pre">attr</span></tt> field (which equals to <tt class="docutils literal"><span class="pre">&quot;subfield&quot;</span></tt>) infers that a variable described by the
+nested AST node must a dictionary with <tt class="docutils literal"><span class="pre">&quot;subfield&quot;</span></tt> key.</p>
+<p>It calls a visitor for inner node and <tt class="xref py py-func docutils literal"><span class="pre">visit_getattr()</span></tt> gets called again, but
+with different arguments:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">ast</span> <span class="o">=</span> <span class="n">Getattr</span><span class="p">(</span><span class="n">node</span><span class="o">=</span><span class="n">Name</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s">&#39;data&#39;</span><span class="p">,</span> <span class="n">ctx</span><span class="o">=</span><span class="s">&#39;load&#39;</span><span class="p">),</span> <span class="n">attr</span><span class="o">=</span><span class="s">&#39;field&#39;</span><span class="p">)</span>
+<span class="n">ctx</span> <span class="o">=</span> <span class="n">Context</span><span class="p">(</span><span class="n">return_struct_cls</span><span class="o">=</span><span class="n">Scalar</span><span class="p">,</span> <span class="n">predicted_struct</span><span class="o">=</span><span class="n">Dictionary</span><span class="p">({</span><span class="n">subfield</span><span class="p">:</span> <span class="n">Scalar</span><span class="p">()}))</span>
+</pre></div>
+</div>
+<p><tt class="xref py py-func docutils literal"><span class="pre">visit_getattr()</span></tt> applies the same logic again. The inner node is a <tt class="xref py py-class docutils literal"><span class="pre">nodes.Name</span></tt>, so that
+it calls <tt class="xref py py-func docutils literal"><span class="pre">visit_name()</span></tt> with the following arguments:</p>
+<div class="highlight-python"><div class="highlight"><pre>ast = Name(name=&#39;data&#39;)
+ctx = Context(
+    return_struct_cls=Scalar,
+    predicted_struct=Dictionary({
+        field: Dictionary({subfield: Scalar()}))
+    })
+)
+</pre></div>
+</div>
+<p><tt class="xref py py-func docutils literal"><span class="pre">visit_name()</span></tt> does not do much by itself. Based on a context in knows what structure and
+what type must have a variable described by a given <tt class="xref py py-class docutils literal"><span class="pre">nodes.Name</span></tt> node, so
+it just returns a pair:</p>
+<div class="highlight-python"><div class="highlight"><pre>(instance of context.return_struct_cls, Dictionary({data: context.predicted_struct}})
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="exception">
+<dt id="jinja2schema.core.MergeException">
+<em class="property">exception </em><tt class="descclassname">jinja2schema.core.</tt><tt class="descname">MergeException</tt><big>(</big><em>fst</em>, <em>snd</em><big>)</big><a class="reference internal" href="_modules/jinja2schema/core.html#MergeException"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jinja2schema.core.MergeException" title="Permalink to this definition">¶</a></dt>
+<dd><p>Conflict of merging two structures.</p>
+<dl class="attribute">
+<dt id="jinja2schema.core.MergeException.fst">
+<tt class="descname">fst</tt><a class="headerlink" href="#jinja2schema.core.MergeException.fst" title="Permalink to this definition">¶</a></dt>
+<dd><p><tt class="xref py py-class docutils literal"><span class="pre">Variable</span></tt></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="jinja2schema.core.MergeException.snd">
+<tt class="descname">snd</tt><a class="headerlink" href="#jinja2schema.core.MergeException.snd" title="Permalink to this definition">¶</a></dt>
+<dd><p><tt class="xref py py-class docutils literal"><span class="pre">Variable</span></tt></p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="exception">
+<dt id="jinja2schema.core.UnexpectedExpression">
+<em class="property">exception </em><tt class="descclassname">jinja2schema.core.</tt><tt class="descname">UnexpectedExpression</tt><big>(</big><em>expected_struct</em>, <em>actual_ast</em>, <em>actual_struct</em><big>)</big><a class="reference internal" href="_modules/jinja2schema/core.html#UnexpectedExpression"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jinja2schema.core.UnexpectedExpression" title="Permalink to this definition">¶</a></dt>
+<dd><p>Raised when a visitor was expecting compatibility with <a class="reference internal" href="#jinja2schema.core.UnexpectedExpression.expected_struct" title="jinja2schema.core.UnexpectedExpression.expected_struct"><tt class="xref py py-attr docutils literal"><span class="pre">expected_struct</span></tt></a>,
+but got <a class="reference internal" href="#jinja2schema.core.UnexpectedExpression.actual_ast" title="jinja2schema.core.UnexpectedExpression.actual_ast"><tt class="xref py py-attr docutils literal"><span class="pre">actual_ast</span></tt></a> of structure <tt class="xref py py-attr docutils literal"><span class="pre">actual_struct</span></tt>.</p>
+<p>Compatibility is checked by merging expected structure with actual one.</p>
+<dl class="attribute">
+<dt id="jinja2schema.core.UnexpectedExpression.expected_struct">
+<tt class="descname">expected_struct</tt><a class="headerlink" href="#jinja2schema.core.UnexpectedExpression.expected_struct" title="Permalink to this definition">¶</a></dt>
+<dd><p>expected <a class="reference internal" href="#jinja2schema.model.Variable" title="jinja2schema.model.Variable"><tt class="xref py py-class docutils literal"><span class="pre">model.Variable</span></tt></a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="jinja2schema.core.UnexpectedExpression.actual_ast">
+<tt class="descname">actual_ast</tt><a class="headerlink" href="#jinja2schema.core.UnexpectedExpression.actual_ast" title="Permalink to this definition">¶</a></dt>
+<dd><p>actual <tt class="xref py py-class docutils literal"><span class="pre">jinja2.nodes.Node</span></tt></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt>
+<tt class="descname">actual_ast</tt></dt>
+<dd><p><a class="reference internal" href="#jinja2schema.model.Variable" title="jinja2schema.model.Variable"><tt class="xref py py-class docutils literal"><span class="pre">model.Variable</span></tt></a> described by <tt class="docutils literal"><span class="pre">actual_ast</span></tt></p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="exception">
+<dt id="jinja2schema.core.InvalidExpression">
+<em class="property">exception </em><tt class="descclassname">jinja2schema.core.</tt><tt class="descname">InvalidExpression</tt><big>(</big><em>ast</em>, <em>message</em><big>)</big><a class="reference internal" href="_modules/jinja2schema/core.html#InvalidExpression"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jinja2schema.core.InvalidExpression" title="Permalink to this definition">¶</a></dt>
+<dd><p>Raised when a template uses Jinja2 features that are not supported by the library
+or when a template contains incorrect expressions (i.e., such as applying <tt class="docutils literal"><span class="pre">divisibleby</span></tt> filter
+without an argument).</p>
+<dl class="attribute">
+<dt id="jinja2schema.core.InvalidExpression.ast">
+<tt class="descname">ast</tt><a class="headerlink" href="#jinja2schema.core.InvalidExpression.ast" title="Permalink to this definition">¶</a></dt>
+<dd><p><tt class="xref py py-class docutils literal"><span class="pre">jinja2.nodes.Node</span></tt> caused the exception</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="jinja2schema.core.merge">
+<tt class="descclassname">jinja2schema.core.</tt><tt class="descname">merge</tt><big>(</big><em>fst</em>, <em>snd</em><big>)</big><a class="reference internal" href="_modules/jinja2schema/core.html#merge"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jinja2schema.core.merge" title="Permalink to this definition">¶</a></dt>
+<dd><p>Merges two variables.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>fst</strong> (<a class="reference internal" href="#jinja2schema.model.Variable" title="jinja2schema.model.Variable"><tt class="xref py py-class docutils literal"><span class="pre">model.Variable</span></tt></a>) &#8211; first variable</li>
+<li><strong>snd</strong> (<a class="reference internal" href="#jinja2schema.model.Variable" title="jinja2schema.model.Variable"><tt class="xref py py-class docutils literal"><span class="pre">model.Variable</span></tt></a>) &#8211; second variable</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last"><tt class="docutils literal"><span class="pre">fst</span></tt> must reflect expressions that occur in template <strong>before</strong> the expressions of <tt class="docutils literal"><span class="pre">snd</span></tt>.</p>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="jinja2schema.core.infer_from_ast">
+<tt class="descclassname">jinja2schema.core.</tt><tt class="descname">infer_from_ast</tt><big>(</big><em>ast</em><big>)</big><a class="reference internal" href="_modules/jinja2schema/core.html#infer_from_ast"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jinja2schema.core.infer_from_ast" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="jinja2schema.core.parse">
+<tt class="descclassname">jinja2schema.core.</tt><tt class="descname">parse</tt><big>(</big><em>template</em>, <em>jinja2_env=None</em><big>)</big><a class="reference internal" href="_modules/jinja2schema/core.html#parse"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jinja2schema.core.parse" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><tt class="xref py py-class docutils literal"><span class="pre">nodes.Template</span></tt></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="jinja2schema.core.infer">
+<tt class="descclassname">jinja2schema.core.</tt><tt class="descname">infer</tt><big>(</big><em>template</em><big>)</big><a class="reference internal" href="_modules/jinja2schema/core.html#infer"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jinja2schema.core.infer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a <tt class="xref py py-class docutils literal"><span class="pre">Dictionary</span></tt> that describes a structure of a context required by <tt class="docutils literal"><span class="pre">template</span></tt>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">class:<cite>Dictionary</cite></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<span class="target" id="module-jinja2schema.model"></span><dl class="class">
+<dt id="jinja2schema.model.Variable">
+<em class="property">class </em><tt class="descclassname">jinja2schema.model.</tt><tt class="descname">Variable</tt><big>(</big><em>label=None</em>, <em>linenos=None</em>, <em>constant=False</em>, <em>may_be_defined=False</em>, <em>used_with_default=False</em><big>)</big><a class="reference internal" href="_modules/jinja2schema/model.html#Variable"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jinja2schema.model.Variable" title="Permalink to this definition">¶</a></dt>
+<dd><p>A base variable class.</p>
+<dl class="attribute">
+<dt id="jinja2schema.model.Variable.linenos">
+<tt class="descname">linenos</tt><a class="headerlink" href="#jinja2schema.model.Variable.linenos" title="Permalink to this definition">¶</a></dt>
+<dd><p>An ordered list of line numbers on which the variable occurs.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="jinja2schema.model.Variable.label">
+<tt class="descname">label</tt><a class="headerlink" href="#jinja2schema.model.Variable.label" title="Permalink to this definition">¶</a></dt>
+<dd><p>A name of the variable in template.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+      
+        <a href="index.html" class="btn btn-neutral" title="jinja2schema"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2014, Anton Romanovich.
+    </p>
+  </div>
+
+  <a href="https://github.com/snide/sphinx_rtd_theme">Sphinx theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.0.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

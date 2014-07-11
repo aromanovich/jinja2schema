@@ -213,7 +213,7 @@ class Tuple(Variable):
 
 class Scalar(Variable):
     def __repr__(self):
-        return self.label or '<scalar>'
+        return '<scalar>'
 
     def to_json_schema(self):
         rv = super(Scalar, self).to_json_schema()
@@ -230,7 +230,7 @@ class Scalar(Variable):
 
 class Unknown(Variable):
     def __repr__(self):
-        return self.label or '<unknown>'
+        return '<unknown>'
 
     def to_json_schema(self):
         rv = super(Unknown, self).to_json_schema()
