@@ -14,18 +14,18 @@ class Variable(object):
 
         A name of the variable in template.
 
-    .. attribute: constant
+    .. attribute:: constant
 
         Is true if the variable is defined by a {% set %} tag before used in the template.
 
-    .. attribute: may_be_defined
+    .. attribute:: may_be_defined
 
         Is true if the variable would be defined by a {% set %} tag if it is undefined.
         For example, ``x`` is ``may_be_defined`` in the following template::
 
             {% if x is undefined %} {% set x = 1 %} {% endif %}
 
-    .. attribute: used_with_default
+    .. attribute:: used_with_default
 
         Is true if the variable occurs _only_ within the ``default`` filter.
     """
@@ -90,6 +90,12 @@ class Dictionary(Variable):
         self.data = data or {}
         super(Dictionary, self).__init__(**kwargs)
 
+    def __eq__(self, other):
+        return super(Dictionary, self).__eq__(other) and self.data == other.data
+
+    def __repr__(self):
+        return pprint.pformat(self.data)
+
     def clone(self):
         rv = super(Dictionary, self).clone()
         rv.data = {}
@@ -101,9 +107,6 @@ class Dictionary(Variable):
     def from_ast(cls, ast, data=None, **kwargs):
         kwargs = dict(cls._get_kwargs_from_ast(ast), **kwargs)
         return cls(data, **kwargs)
-
-    def __eq__(self, other):
-        return super(Dictionary, self).__eq__(other) and self.data == other.data
 
     def __setitem__(self, key, value):
         self.data[key] = value
@@ -138,9 +141,6 @@ class Dictionary(Variable):
     def pop(self, key, default=None):
         return self.data.pop(key, default)
 
-    def __repr__(self):
-        return pprint.pformat(self.data)
-
     def to_json_schema(self):
         rv = super(Dictionary, self).to_json_schema()
         rv.update({
@@ -156,6 +156,12 @@ class List(Variable):
         self.item = item
         super(List, self).__init__(**kwargs)
 
+    def __eq__(self, other):
+        return super(List, self).__eq__(other) and self.item == other.item
+
+    def __repr__(self):
+        return pprint.pformat([self.item])
+
     def clone(self):
         rv = super(List, self).clone()
         rv.item = self.item.clone()
@@ -165,12 +171,6 @@ class List(Variable):
     def from_ast(cls, ast, item, **kwargs):
         kwargs = dict(cls._get_kwargs_from_ast(ast), **kwargs)
         return cls(item, **kwargs)
-
-    def __eq__(self, other):
-        return super(List, self).__eq__(other) and self.item == other.item
-
-    def __repr__(self):
-        return pprint.pformat([self.item])
 
     def to_json_schema(self):
         rv = super(List, self).to_json_schema()
@@ -186,6 +186,12 @@ class Tuple(Variable):
         self.items = tuple(items) if items is not None else None
         super(Tuple, self).__init__(**kwargs)
 
+    def __eq__(self, other):
+        return super(Tuple, self).__eq__(other) and self.items == other.items
+
+    def __repr__(self):
+        return pprint.pformat(self.items)
+
     def clone(self):
         rv = super(Tuple, self).clone()
         rv.items = tuple(s.clone() for s in self.items)
@@ -195,12 +201,6 @@ class Tuple(Variable):
     def from_ast(cls, ast, items, **kwargs):
         kwargs = dict(cls._get_kwargs_from_ast(ast), **kwargs)
         return cls(items, **kwargs)
-
-    def __eq__(self, other):
-        return super(Tuple, self).__eq__(other) and self.items == other.items
-
-    def __repr__(self):
-        return pprint.pformat(self.items)
 
     def to_json_schema(self):
         rv = super(Tuple, self).to_json_schema()

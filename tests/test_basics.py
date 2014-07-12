@@ -1,7 +1,8 @@
 import pytest
 from jinja2 import nodes
 
-from jinja2schema.core import infer, MergeException, UnexpectedExpression
+from jinja2schema.core import infer
+from jinja2schema.exceptions import MergeException, UnexpectedExpression
 from jinja2schema.model import List, Dictionary, Scalar, Unknown
 
 

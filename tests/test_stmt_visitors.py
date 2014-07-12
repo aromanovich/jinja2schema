@@ -1,8 +1,9 @@
 from jinja2 import nodes
 import pytest
 
-from jinja2schema.core import (parse, infer_from_ast, MergeException, UnexpectedExpression,
-                               visit_assign, visit_if, visit_for)
+from jinja2schema.core import parse, infer_from_ast
+from jinja2schema.visitors.stmt import visit_assign, visit_if, visit_for
+from jinja2schema.exceptions import MergeException, UnexpectedExpression
 from jinja2schema.model import Dictionary, Scalar, List, Unknown, Tuple
 
 
