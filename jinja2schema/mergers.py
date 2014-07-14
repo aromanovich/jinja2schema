@@ -1,3 +1,8 @@
+# coding: utf-8
+"""
+jinja2schema.mergers
+~~~~~~~~~~~~~~~~~~~~
+"""
 import itertools
 
 from .model import Scalar, Dictionary, List, Unknown, Tuple

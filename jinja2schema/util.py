@@ -1,3 +1,8 @@
+# coding: utf-8
+"""
+jinja2schema.util
+~~~~~~~~~~~~~~~~~
+"""
 from .model import Dictionary, Scalar, List, Unknown, Tuple
 
 
@@ -44,4 +49,8 @@ def _debug_repr(var):
 
 
 def debug_repr(var):
+    """
+    :param var: instance of :class:`Variable`
+    :return: a string with detailed representation of ``var``
+    """
     return '\n'.join(_debug_repr(var))

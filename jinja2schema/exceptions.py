@@ -1,4 +1,15 @@
-class MergeException(Exception):
+# coding: utf-8
+"""
+jinja2schema.exceptions
+~~~~~~~~~~~~~~~~~~~~~~~
+"""
+
+
+class InferException(Exception):
+    """Base class for jinja2schema exceptions."""
+
+
+class MergeException(InferException):
     """Conflict of merging two structures.
 
     .. attribute:: fst
@@ -24,7 +35,7 @@ class MergeException(Exception):
                     fst_linenos=get_linenos(self.fst), snd_linenos=get_linenos(self.snd))
 
 
-class UnexpectedExpression(Exception):
+class UnexpectedExpression(InferException):
     """Raised when a visitor was expecting compatibility with :attr:`expected_struct`,
     but got :attr:`actual_ast` of structure :attr:`actual_struct`.
 
@@ -57,7 +68,7 @@ class UnexpectedExpression(Exception):
                     expected_struct=self.expected_struct)
 
 
-class InvalidExpression(Exception):
+class InvalidExpression(InferException):
     """Raised when a template uses Jinja2 features that are not supported by the library
     or when a template contains incorrect expressions (i.e., such as applying ``divisibleby`` filter
     without an argument).

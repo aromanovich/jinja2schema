@@ -1,50 +1,60 @@
+# coding: utf-8
 """
-There are two types of visitors, expression and statement.
-
-Expression visitors return tuple which contains expression type and expression structure.
-
-Statement visitors return :class:`.models.Dictionary` which contains
-structures of variables used within the statement.
+jinja2schema.core
+~~~~~~~~~~~~~~~~~
 """
 import jinja2
 
-from .visitors import visit_many
-from .model import Scalar, Dictionary
-
-
-def _post_process(var):
-    if isinstance(var, Dictionary):
-        for k, v in var.items():
-            if v.constant and not v.may_be_defined:
-                del var[k]
-            else:
-                _post_process(v)
-    return var
-
-
-def infer_from_ast(ast):
-    """
-    :type ast: :class:`nodes.Template`
-    """
-    rv = visit_many(ast.body, Scalar)
-    return _post_process(rv)
+from .model import Dictionary
+from .visitors import visit
 
 
 def parse(template, jinja2_env=None):
-    """
+    """Parses Jinja2 template and returns it's AST.
+
     :type template: basestring
     :type jinja2_env: :class:`jinja2.Environment`
-    :rtype: :class:`nodes.Template`
+    :rtype: :class:`jinja2.nodes.Template`
     """
     if jinja2_env is None:
         jinja2_env = jinja2.Environment()
     return jinja2_env.parse(template)
 
 
-def infer(template):
-    """Returns a :class:`Dictionary` that describes a structure of a context required by ``template``.
+def _ignore_constants(var):
+    if isinstance(var, Dictionary):
+        for k, v in var.items():
+            if v.constant and not v.may_be_defined:
+                del var[k]
+            else:
+                _ignore_constants(v)
+    return var
 
-    :type template: basestring
-    :rtype: class:`Dictionary`
+
+def infer_from_ast(ast, ignore_constants=True):
+    """Returns a :class:`.model.Dictionary` which reflects a structure of variables used
+    within ``ast``.
+
+    :param ast: AST
+    :type ast: :class:`jinja2.nodes.Node`
+    :param ignore_constants: excludes constant variables from a resulting structure
+    :rtype: :class:`.model.Dictionary`
+    :raises: :class:`.exceptions.MergeException`, :class:`.exceptions.InvalidExpression`,
+             :class:`.exceptions.UnexpectedExpression`
     """
-    return infer_from_ast(parse(template))
+    rv = visit(ast)
+    if ignore_constants:
+        rv = _ignore_constants(rv)
+    return rv
+
+
+def infer(template):
+    """Returns a :class:`.model.Dictionary` which reflects a structure of the context required by ``template``.
+
+    :param template: a template
+    :type template: basestring
+    :rtype: :class:`.model.Dictionary`
+    :raises: :class:`.exceptions.MergeException`, :class:`.exceptions.InvalidExpression`,
+             :class:`.exceptions.UnexpectedExpression`
+    """
+    return infer_from_ast(parse(template), ignore_constants=True)

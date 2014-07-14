@@ -1,11 +1,173 @@
+# coding: utf-8
+"""
+jinja2schema.visitors.expr
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Expression is an instance of :class:`jinja2.nodes.Expr`.
+Expression visitors return a tuple which contains expression type and expression structure.
+"""
+import functools
+
 from jinja2 import nodes
 
-from . import visits_expr, visit_expr
-from . import visit_many
-from ..exceptions import InvalidExpression
-from ..context import Context
-from ..mergers import merge_rtypes, merge
 from ..model import Scalar, Dictionary, List, Unknown, Tuple
+from ..mergers import merge_rtypes, merge
+from ..exceptions import InvalidExpression, UnexpectedExpression, MergeException
+from .util import visit_many
+
+
+class Context(object):
+    """
+    Context is used when parsing expressions.
+
+    Suppose there is an expression::
+
+        {{ data.field.subfield }}
+
+    It has the following AST::
+
+        Getattr(
+            node=Getattr(
+                node=Name(name='data')
+                attr='field'
+            ),
+            attr='subfield'
+        )
+
+    :func:`visit_getattr` returns a pair that looks like this::
+
+        (
+            # return type:
+            Scalar(...),
+            # structure:
+            {
+                'data: {
+                    'field': {
+                        'subfield': Scalar(...)
+                    }
+                }
+            }
+        }
+
+    The return type is defined by the outermost :class:`nodes.Getattr` node, which
+    in this case is being printed.
+    The structure is build during AST traversal from outer to inners nodes and it is
+    kind of "reversed" in relation to the AST.
+    :class:`Context` is intended for:
+
+    * capturing a return type and passing it to the innermost expression node;
+    * passing a structure "under construction" to the visitors of nested nodes.
+
+    Let's look through an example.
+
+    Suppose :func:`visit_getattr` is called with the following arguments::
+
+       ast = Getattr(node=Getattr(node=Name(name='data'), attr='field'), attr='subfield'))
+       context = Context(return_struct_cls=Scalar, predicted_struct=Scalar())
+
+    It looks to the outermost AST node and based on it's type (which is :class:`nodes.Getattr`)
+    and it's ``attr`` field (which equals to ``"subfield"``) infers that a variable described by the
+    nested AST node must a dictionary with ``"subfield"`` key.
+
+    It calls a visitor for inner node and :func:`visit_getattr` gets called again, but
+    with different arguments::
+
+       ast = Getattr(node=Name(name='data', ctx='load'), attr='field')
+       ctx = Context(return_struct_cls=Scalar, predicted_struct=Dictionary({subfield: Scalar()}))
+
+    :func:`visit_getattr` applies the same logic again. The inner node is a :class:`nodes.Name`, so that
+    it calls :func:`visit_name` with the following arguments::
+
+       ast = Name(name='data')
+       ctx = Context(
+           return_struct_cls=Scalar,
+           predicted_struct=Dictionary({
+               field: Dictionary({subfield: Scalar()}))
+           })
+       )
+
+    :func:`visit_name` does not do much by itself. Based on a context in knows what structure and
+    what type must have a variable described by a given :class:`nodes.Name` node, so
+    it just returns a pair::
+
+        (instance of context.return_struct_cls, Dictionary({data: context.predicted_struct}})
+    """
+    def __init__(self, return_struct_cls=None, predicted_struct=None):
+        self.return_struct_cls = return_struct_cls if return_struct_cls is not None else Unknown
+        self.predicted_struct = predicted_struct if predicted_struct is not None else Unknown()
+
+    def get_predicted_struct(self, label=None):
+        rv = self.predicted_struct.clone()
+        if label:
+            rv.label = label
+        return rv
+
+    def meet(self, actual_struct, actual_ast):
+        try:
+            merge(self.predicted_struct, actual_struct)
+        except MergeException:
+            raise UnexpectedExpression(self.predicted_struct, actual_ast, actual_struct)
+        else:
+            return True
+
+
+expr_visitors = {}
+
+
+def visits_expr(node_cls):
+    """Decorator that registers a function as a visitor for ``node_cls``.
+
+    :param node_cls: subclass of :class:`jinja2.nodes.Expr`
+    """
+    def decorator(func):
+        expr_visitors[node_cls] = func
+        @functools.wraps(func)
+        def wrapped_func(ast, ctx):
+            assert isinstance(ast, node_cls)
+            return func(ast, ctx)
+        return wrapped_func
+    return decorator
+
+
+def visit_expr(ast, ctx):
+    """Returns a structure of ``ast``.
+
+    :param ctx: :class:`Context`
+    :param ast: instance of :class:`jinja2.nodes.Expr`
+    :returns: a tuple where the first element is an expression type (instance of :class:`Variable`)
+              and the second element is an expression structure (instance of :class:`.model.Dictionary`)
+    """
+    visitor = expr_visitors.get(type(ast))
+    if not visitor:
+        for node_cls, visitor_ in expr_visitors.iteritems():
+            if isinstance(ast, node_cls):
+                visitor = visitor_
+    if not visitor:
+        raise Exception('expression visitor for {} is not found'.format(type(ast)))
+    return visitor(ast, ctx)
+
+
+def _visit_dict(ast, ctx, items):
+    """A common logic behind nodes.Dict and nodes.Call (``{{ dict(a=1) }}``)
+    visitors.
+
+    :param items: a list of (key, value); key may be either AST node or string
+    """
+    ctx.meet(Dictionary(), ast)
+    rtype = Dictionary.from_ast(ast, constant=True)
+    struct = Dictionary()
+    for key, value in items:
+        value_rtype, value_struct = visit_expr(value, Context(
+            predicted_struct=Unknown.from_ast(value)))
+        struct = merge(struct, value_struct)
+        if isinstance(key, nodes.Node):
+            key_rtype, key_struct = visit_expr(key, Context(predicted_struct=Scalar.from_ast(key)))
+            struct = merge(struct, key_struct)
+            if isinstance(key, nodes.Const):
+                rtype[key.value] = value_rtype
+        elif isinstance(key, basestring):
+            rtype[key] = value_rtype
+    return rtype, struct
 
 
 @visits_expr(nodes.BinExpr)
@@ -260,29 +422,6 @@ def visit_list(ast, ctx):
         else:
             el_rtype = merge_rtypes(el_rtype, item_rtype)
     rtype = List.from_ast(ast, el_rtype or Unknown(), constant=True)
-    return rtype, struct
-
-
-def _visit_dict(ast, ctx, items):
-    """A common logic behind nodes.Dict and nodes.Call (``{{ dict(a=1) }}``)
-    visitors.
-
-    :param items: a list of (key, value); key may be either ast or string
-    """
-    ctx.meet(Dictionary(), ast)
-    rtype = Dictionary.from_ast(ast, constant=True)
-    struct = Dictionary()
-    for key, value in items:
-        value_rtype, value_struct = visit_expr(value, Context(
-            predicted_struct=Unknown.from_ast(value)))
-        struct = merge(struct, value_struct)
-        if isinstance(key, nodes.Node):
-            key_rtype, key_struct = visit_expr(key, Context(predicted_struct=Scalar.from_ast(key)))
-            struct = merge(struct, key_struct)
-            if isinstance(key, nodes.Const):
-                rtype[key.value] = value_rtype
-        elif isinstance(key, basestring):
-            rtype[key] = value_rtype
     return rtype, struct
 
 

@@ -1,11 +1,55 @@
+# coding: utf-8
+"""
+jinja2schema.visitors.stmt
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Statement is an instance of :class:`jinja2.nodes.Stmt`.
+Statement visitors return :class:`.models.Dictionary` of structures of variables used within the statement.
+"""
+import functools
 import itertools
+
 from jinja2 import nodes
 
-from ..exceptions import InvalidExpression
-from ..mergers import merge
-from ..context import Context
 from ..model import Scalar, Dictionary, List, Unknown, Tuple
-from . import visits_stmt, visit_expr, visit_many
+from ..mergers import merge
+from ..exceptions import InvalidExpression
+from .expr import Context, visit_expr
+from .util import visit_many
+
+
+stmt_visitors = {}
+
+
+def visits_stmt(node_cls):
+    """Decorator that registers a function as a visitor for ``node_cls``.
+
+    :param node_cls: subclass of :class:`jinja2.nodes.Stmt`
+    """
+    def decorator(func):
+        stmt_visitors[node_cls] = func
+        @functools.wraps(func)
+        def wrapped_func(ast):
+            assert isinstance(ast, node_cls)
+            return func(ast)
+        return wrapped_func
+    return decorator
+
+
+def visit_stmt(ast):
+    """Returns a structure of ``ast``.
+
+    :param ast: instance of :class:`jinja2.nodes.Stmt`
+    :returns: :class:`.model.Dictionary`
+    """
+    visitor = stmt_visitors.get(type(ast))
+    if not visitor:
+        for node_cls, visitor_ in stmt_visitors.iteritems():
+            if isinstance(ast, node_cls):
+                visitor = visitor_
+    if not visitor:
+        raise Exception('stmt visitor for {} is not found'.format(type(ast)))
+    return visitor(ast)
 
 
 @visits_stmt(nodes.For)
@@ -95,8 +139,3 @@ def visit_assign(ast):
 @visits_stmt(nodes.Output)
 def visit_output(ast):
     return visit_many(ast.nodes, Scalar)
-
-
-@visits_stmt(nodes.Template)
-def visit_template(ast):
-    return visit_many(ast.body, Scalar)

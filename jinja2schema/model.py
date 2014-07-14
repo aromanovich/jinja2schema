@@ -1,3 +1,8 @@
+# coding: utf-8
+"""
+jinja2schema.model
+~~~~~~~~~~~~~~~~~~
+"""
 import pprint
 
 from jinja2 import nodes
@@ -16,18 +21,18 @@ class Variable(object):
 
     .. attribute:: constant
 
-        Is true if the variable is defined by a {% set %} tag before used in the template.
+        Is true if the variable is defined using a ``{% set %}`` tag before used in the template.
 
     .. attribute:: may_be_defined
 
-        Is true if the variable would be defined by a {% set %} tag if it is undefined.
-        For example, ``x`` is ``may_be_defined`` in the following template::
+        Is true if the variable would be defined (using a ``{% set %}`` expression) if it is missing
+        from the template context. For example, ``x`` is ``may_be_defined`` in the following template::
 
             {% if x is undefined %} {% set x = 1 %} {% endif %}
 
     .. attribute:: used_with_default
 
-        Is true if the variable occurs _only_ within the ``default`` filter.
+        Is true if the variable occurs **only** within the ``default`` filter.
     """
     def __init__(self, label=None, linenos=None, constant=False,
                  may_be_defined=False, used_with_default=False):
@@ -55,6 +60,11 @@ class Variable(object):
 
     @classmethod
     def from_ast(cls, ast, **kwargs):
+        """Constructs a variable extracting information from ``ast`` (such as label and line numbers).
+
+        :param ast: AST node
+        :type ast: :class:`jinja2.nodes.Node`
+        """
         for k, v in kwargs.items():
             if v is None:
                 del kwargs[k]
@@ -79,6 +89,10 @@ class Variable(object):
         return not self.__eq__(other)
 
     def to_json_schema(self):
+        """Returns JSON schema of the variable.
+
+        :rtype: :class:`dict`
+        """
         rv = {}
         if self.label:
             rv['title'] = self.label
@@ -86,6 +100,21 @@ class Variable(object):
 
 
 class Dictionary(Variable):
+    """A dictionary.
+
+    Implements some methods of Python :class:`dict`.
+
+    .. automethod:: __setitem__
+    .. automethod:: __getitem__
+    .. automethod:: __delitem__
+    .. automethod:: get
+    .. automethod:: items
+    .. automethod:: iteritems
+    .. automethod:: keys
+    .. automethod:: iterkeys
+    .. automethod:: pop
+    """
+
     def __init__(self, data=None, **kwargs):
         self.data = data or {}
         super(Dictionary, self).__init__(**kwargs)
@@ -114,11 +143,11 @@ class Dictionary(Variable):
     def __getitem__(self, key):
         return self.data[key]
 
-    def __contains__(self, key):
-        return key in self.data
-
     def __delitem__(self, key):
         del self.data[key]
+
+    def __contains__(self, key):
+        return key in self.data
 
     def get(self, name, default=None):
         if name in self:
@@ -152,6 +181,12 @@ class Dictionary(Variable):
 
 
 class List(Variable):
+    """A list which items are of the same type.
+
+    .. attribute:: item
+
+        A structure of list items, subclass of :class:`Variable`.
+    """
     def __init__(self, item, **kwargs):
         self.item = item
         super(List, self).__init__(**kwargs)
@@ -182,6 +217,12 @@ class List(Variable):
 
 
 class Tuple(Variable):
+    """A tuple.
+
+    .. attribute:: items
+
+        A :class:`tuple` of :class:`Variable` instances or ``None`` if the tuple items are unknown.
+    """
     def __init__(self, items, **kwargs):
         self.items = tuple(items) if items is not None else None
         super(Tuple, self).__init__(**kwargs)
@@ -212,6 +253,7 @@ class Tuple(Variable):
 
 
 class Scalar(Variable):
+    """A scalar. Either string, number, boolean or ``None``."""
     def __repr__(self):
         return '<scalar>'
 
@@ -229,6 +271,7 @@ class Scalar(Variable):
 
 
 class Unknown(Variable):
+    """A variable which type is unknown."""
     def __repr__(self):
         return '<unknown>'
 

@@ -5,10 +5,14 @@ Release v\ |version|.
 
 jinja2schema is a library for inferring types from `Jinja2`_ templates.
 
+One of the possible usages of jinja2schema is to create a JSON schema of a context expected by the template
+and then use it to render a form (using such JS libraries as `Alpaca`_ or `JSON Editor`_) or to validate
+user input.
+
 Examples
 --------
 
-Let's try some expressions:
+Let's get started by inferring types from some expressions.
 
     >>> from jinja2schema import infer
     >>> infer('{{ x }}')
@@ -20,7 +24,7 @@ Let's try some expressions:
     >>> infer('{{ (x.a.b|first).name }}')
     {'x': {'a': {'b': [{'name': <scalar>}]}}
 
-Let's add flow control structures and use builtin filters:
+jinja2schema supports all the flow control structures...
 
     >>> infer('''
     ... {% for row in items|batch(3, '&nbsp;') %}
@@ -35,6 +39,8 @@ Let's add flow control structures and use builtin filters:
     ... ''')
     {'items': [{'desc': <scalar>, 'has_title': <unknown>, 'title': <scalar>}]}
 
+...and doesn't get confused by scopes.
+
     >>> s = infer('''
     ... {% for x in xs %}
     ...     {% for x in ys %}
@@ -46,8 +52,7 @@ Let's add flow control structures and use builtin filters:
     >>> s
     {'xs': [{'b': <scalar>}], 'ys': [{'a': <scalar>}]}
 
-
-Any structure can be converted to `JSON schema`_:
+As it was said before, any structure can be converted to `JSON schema`_.
 
     >>> schema = infer('{% for x in xs %}{{ x }}{% endfor %}').to_json_schema()
     >>> print json.dumps(schema, indent=2)
@@ -71,7 +76,7 @@ Any structure can be converted to `JSON schema`_:
       "required": ["xs"]
     }
 
-:func:`debug_repr` shows much more detailed representation of ``s``:
+To get a more detailed representation of a structure, one could use :func:`debug_repr`.
 
     >>> from jinja2schema.util import debug_repr
     >>> print debug_repr(s)
@@ -91,11 +96,18 @@ Any structure can be converted to `JSON schema`_:
 .. links
 
 .. _Jinja2: http://jinja.pocoo.org/docs/
+.. _Alpaca: http://www.alpacajs.org/
+.. _JSON Editor: https://github.com/jdorn/json-editor
 .. _JSON schema: http://json-schema.org/
 
-Overview
---------
+How It Works
+------------
 jinja2schema logic based on the following common sense assumptions.
+
+.. note::
+
+    This list is not exhausting and is a subject to change. Probably some of these "axioms" will be customizable
+    at some point in the future.
 
 * If ``x`` is printed (``{{ x }}``), ``x`` is a scalar: a string, a number or a boolean;
 * If ``x`` is used as an iterable in for loop (``{% for item in x %}``), used with
@@ -104,12 +116,25 @@ jinja2schema logic based on the following common sense assumptions.
 * If ``x`` is used with a dot (``x.field``) or being indexed with a string (``x['field']``),
   ``x`` is a dictionary.
 * A variable can only be used in the one role. So that a list or dictionary can not be printed,
-  a string can not be indexed;
-* Lists are assumed to be homogeneous, meaning all elements of the same list are assumed to
-  have the same structure.
+  a string can not be indexed::
 
-This list is not exhausting and is a subject to change. Probably some of these assumptions will be customizable
-at some point in the future.
+    >>> infer('''
+    ... {{ x }}
+    ... {{ x.name }}
+    ... ''')
+    jinja2schema.exceptions.MergeException: variable "x" (lines: 2, used as scalar)
+    conflicts with variable "x" (lines: 3, used as dictionary)
+* Lists are assumed to be homogeneous, meaning all elements of the same list are assumed to
+  have the same structure::
+
+    >>> infer('''
+    ... {% set xs = [
+    ...    1,
+    ...    {}
+    ... ] %}
+    ... ''')
+    jinja2schema.exceptions.MergeException: unnamed variable (lines: 3, used as scalar)
+    conflicts with unnamed variable (lines: 4, used as dictionary)
 
 
 Modules

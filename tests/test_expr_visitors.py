@@ -1,11 +1,9 @@
 import pytest
 from jinja2 import nodes
-from jinja2schema.context import Context
 
 from jinja2schema.core import parse
-from jinja2schema.visitors.expr import (visit_getitem, visit_cond_expr, visit_test,
-                                        visit_getattr, visit_compare, visit_filter,
-                                        visit_call)
+from jinja2schema.visitors.expr import (Context, visit_getitem, visit_cond_expr, visit_test,
+                                        visit_getattr, visit_compare, visit_filter, visit_call)
 from jinja2schema.exceptions import UnexpectedExpression, InvalidExpression
 from jinja2schema.model import Dictionary, Scalar, List, Unknown
 
