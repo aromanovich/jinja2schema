@@ -1,28 +1,25 @@
-API
----
-
 .. automodule:: jinja2schema.core
-   :members:
+    :members:
 
 .. automodule:: jinja2schema.model
-   :members:
+    :members:
 
 .. automodule:: jinja2schema.mergers
-   :members:
+    :members:
 
 .. automodule:: jinja2schema.exceptions
-   :members:
+    :members:
 
 .. automodule:: jinja2schema.util
-   :members:
+    :members:
 
 .. automodule:: jinja2schema.visitors.stmt
-   :members:
-   :undoc-members:
+    :members:
+    :undoc-members:
 
 .. automodule:: jinja2schema.visitors.expr
-   :members:
-   :undoc-members:
+    :members:
+    :undoc-members:
 
 .. automodule:: jinja2schema.visitors.util
-   :members:
+    :members:

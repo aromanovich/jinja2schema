@@ -3,6 +3,9 @@ jinja2schema
 
 Release v\ |version|.
 
+Introduction
+------------
+
 jinja2schema is a library for inferring types from `Jinja2`_ templates.
 
 One of the possible usages of jinja2schema is to create a JSON schema of a context expected by the template
@@ -11,7 +14,6 @@ user input.
 
 Examples
 --------
-
 Let's get started by inferring types from some expressions.
 
     >>> from jinja2schema import infer
@@ -136,37 +138,34 @@ jinja2schema logic based on the following common sense assumptions.
     jinja2schema.exceptions.MergeException: unnamed variable (lines: 3, used as scalar)
     conflicts with unnamed variable (lines: 4, used as dictionary)
 
-
-Modules
--------
-
-.. toctree::
-   :maxdepth: 1
-
-   api
-
-Internals
-~~~~~~~~~
-
-For objects you're not likely to see in practice. This is useful if you ever
-feel the need to contribute to the project.
-
-.. toctree::
-   :maxdepth: 1
-
-
 Installation
 ------------
-
 .. code-block:: sh
 
     $ pip install jinja2schema
 
+API
+---
+To infer types from a template, simply call :func:`jinja2schema.infer`.
+
+.. autofunction:: jinja2schema.infer
+
+It will return a :class:`.model.Variable` instance, which can be converted to
+JSON schema using it's :meth:`.model.Variable.to_json_schema` method.
+
+If you need more than that, please take a look at :ref:`internals`.
+
+.. _internals:
+
+Internals
+---------
+
+.. toctree::
+
+    internals
 
 Contributing
 ------------
-
-
 The project is hosted on GitHub_.
 Please feel free to send a pull request or open an issue.
 
@@ -176,13 +175,7 @@ Please feel free to send a pull request or open an issue.
 
 Running the Tests
 ~~~~~~~~~~~~~~~~~
-
 .. code-block:: sh
 
     $ pip install -r ./requirements-dev.txt
     $ ./test.sh
-
-
-.. toctree::
-
-    testing

@@ -52,7 +52,7 @@ def infer(template):
     """Returns a :class:`.model.Dictionary` which reflects a structure of the context required by ``template``.
 
     :param template: a template
-    :type template: basestring
+    :type template: string
     :rtype: :class:`.model.Dictionary`
     :raises: :class:`.exceptions.MergeException`, :class:`.exceptions.InvalidExpression`,
              :class:`.exceptions.UnexpectedExpression`
