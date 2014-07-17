@@ -4,7 +4,7 @@ jinja2schema
 .. image:: https://travis-ci.org/aromanovich/jinja2schema.svg?branch=master
    :target: https://travis-ci.org/aromanovich/jinja2schema
 
-Documentation_ | GitHub_
+Documentation_ | GitHub_ |  PyPI_
 
 A library for inferring types from `Jinja2`_ templates.
 
@@ -58,4 +58,5 @@ License
 .. _Jinja2: http://jinja.pocoo.org/docs/
 .. _Documentation: http://jinja2schema.rtfd.org/
 .. _GitHub: https://github.com/aromanovich/jinja2schema
+.. _PyPI: https://pypi.python.org/pypi/jinja2schema
 .. _BSD license: https://github.com/aromanovich/jinja2schema/blob/master/LICENSE
