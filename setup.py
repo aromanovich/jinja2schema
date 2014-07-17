@@ -3,7 +3,7 @@ import os
 import sys
 import re
 
-from distutils.core import setup
+from setuptools import setup, find_packages
 
 
 __version__ = ''
@@ -34,9 +34,7 @@ setup(
     author='Anton Romanovich',
     author_email='anthony.romanovich@gmail.com',
     url='https://jinja2schema.readthedocs.org',
-    packages=['jinja2schema'],
-    package_data={'': ['LICENSE']},
-    include_package_data=True,
+    packages=find_packages(exclude=['tests']),
     install_requires=['Jinja2>=2.2'],
     classifiers=[
         'Development Status :: 4 - Beta',
