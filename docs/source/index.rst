@@ -12,8 +12,12 @@ One of the possible usages of jinja2schema is to create a JSON schema of a conte
 and then use it to render a form (using such JS libraries as `Alpaca`_ or `JSON Editor`_) or to validate
 user input.
 
+The library is in an early stage of development. Although the code is extensively tested,
+please be prepared for bugs and if you find some, let the author know by `opening a ticket`_.
+
 Examples
 --------
+
 Let's get started by inferring types from some expressions.
 
     >>> from jinja2schema import infer
@@ -97,6 +101,7 @@ To get a more detailed representation of a structure, one could use :func:`debug
 
 .. links
 
+.. _opening a ticket: https://github.com/aromanovich/jinja2schema/issues
 .. _Jinja2: http://jinja.pocoo.org/docs/
 .. _Alpaca: http://www.alpacajs.org/
 .. _JSON Editor: https://github.com/jdorn/json-editor
@@ -104,6 +109,7 @@ To get a more detailed representation of a structure, one could use :func:`debug
 
 How It Works
 ------------
+
 jinja2schema logic based on the following common sense assumptions.
 
 .. note::
@@ -140,12 +146,14 @@ jinja2schema logic based on the following common sense assumptions.
 
 Installation
 ------------
+
 .. code-block:: sh
 
     $ pip install jinja2schema
 
 API
 ---
+
 To infer types from a template, simply call :func:`jinja2schema.infer`.
 
 .. autofunction:: jinja2schema.infer
@@ -166,15 +174,16 @@ Internals
 
 Contributing
 ------------
+
 The project is hosted on GitHub_.
 Please feel free to send a pull request or open an issue.
 
-.. links
 .. _GitHub: https://github.com/aromanovich/jinja2schema
 
 
 Running the Tests
 ~~~~~~~~~~~~~~~~~
+
 .. code-block:: sh
 
     $ pip install -r ./requirements-dev.txt
