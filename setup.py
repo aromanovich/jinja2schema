@@ -1,10 +1,23 @@
 #!/usr/bin/env python
 import os
 import sys
+import re
 
 from distutils.core import setup
 
-from jinja2schema import __version__
+
+__version__ = ''
+with open('jinja2schema/__init__.py', 'r') as fd:
+    reg = re.compile(r'__version__ = [\'"]([^\'"]*)[\'"]')
+    for line in fd:
+        m = reg.match(line)
+        if m:
+            __version__ = m.group(1)
+            break
+
+
+if not __version__:
+    raise RuntimeError('Cannot find version information')
 
 
 if sys.argv[-1] in ('submit', 'publish'):
