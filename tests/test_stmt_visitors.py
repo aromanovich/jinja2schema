@@ -1,5 +1,6 @@
-from jinja2 import nodes
+# coding: utf-8
 import pytest
+from jinja2 import nodes
 
 from jinja2schema.core import parse, infer_from_ast
 from jinja2schema.visitors.stmt import visit_assign, visit_if, visit_for

@@ -7,6 +7,8 @@ import pprint
 
 from jinja2 import nodes
 
+from . import _compat
+
 
 class Variable(object):
     """A base variable class.
@@ -128,7 +130,7 @@ class Dictionary(Variable):
     def clone(self):
         rv = super(Dictionary, self).clone()
         rv.data = {}
-        for k, v in self.data.iteritems():
+        for k, v in _compat.iteritems(self.data):
             rv.data[k] = v.clone()
         return rv
 
@@ -159,13 +161,13 @@ class Dictionary(Variable):
         return self.data.items()
 
     def iteritems(self):
-        return self.data.iteritems()
+        return _compat.iteritems(self.data)
 
     def keys(self):
         return self.data.keys()
 
     def iterkeys(self):
-        return self.data.iterkeys()
+        return _compat.iterkeys(self.data)
 
     def pop(self, key, default=None):
         return self.data.pop(key, default)
@@ -174,8 +176,8 @@ class Dictionary(Variable):
         rv = super(Dictionary, self).to_json_schema()
         rv.update({
             'type': 'object',
-            'properties': dict((k, v.to_json_schema()) for k, v in self.data.iteritems()),
-            'required': [k for k, v in self.data.iteritems() if v.required],
+            'properties': dict((k, v.to_json_schema()) for k, v in self.iteritems()),
+            'required': [k for k, v in self.iteritems() if v.required],
         })
         return rv
 

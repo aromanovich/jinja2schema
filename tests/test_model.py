@@ -1,3 +1,4 @@
+# coding: utf-8
 from jinja2schema.model import Dictionary, Scalar, List, Unknown, Tuple
 
 

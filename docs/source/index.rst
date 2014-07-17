@@ -82,7 +82,7 @@ As it was said before, any structure can be converted to `JSON schema`_.
       "required": ["xs"]
     }
 
-To get a more detailed representation of a structure, one could use :func:`debug_repr`.
+To get a more detailed representation of a structure, one could use :func:`jinja2schema.util.debug_repr`.
 
     >>> from jinja2schema.util import debug_repr
     >>> print debug_repr(s)

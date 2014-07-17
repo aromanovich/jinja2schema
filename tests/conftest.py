@@ -1,3 +1,4 @@
+# coding: utf-8
 import difflib
 
 from jinja2schema.model import Variable

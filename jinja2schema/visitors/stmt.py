@@ -7,13 +7,13 @@ Statement is an instance of :class:`jinja2.nodes.Stmt`.
 Statement visitors return :class:`.models.Dictionary` of structures of variables used within the statement.
 """
 import functools
-import itertools
 
 from jinja2 import nodes
 
 from ..model import Scalar, Dictionary, List, Unknown, Tuple
 from ..mergers import merge
 from ..exceptions import InvalidExpression
+from .. import _compat
 from .expr import Context, visit_expr
 from .util import visit_many
 
@@ -113,7 +113,7 @@ def visit_assign(ast):
             if len(ast.target.items) != len(ast.node.items):
                 raise InvalidExpression(ast, 'number of items in left side is different '
                                              'from right side')
-            for name_ast, var_ast in itertools.izip(ast.target.items, ast.node.items):
+            for name_ast, var_ast in _compat.izip(ast.target.items, ast.node.items):
                 variables.append((name_ast.name, var_ast))
         for var_name, var_ast in variables:
             var_rtype, var_struct = visit_expr(var_ast, Context(predicted_struct=Unknown.from_ast(var_ast)))

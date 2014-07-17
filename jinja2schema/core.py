@@ -7,6 +7,7 @@ import jinja2
 
 from .model import Dictionary
 from .visitors import visit
+from . import _compat
 
 
 def parse(template, jinja2_env=None):
@@ -23,7 +24,7 @@ def parse(template, jinja2_env=None):
 
 def _ignore_constants(var):
     if isinstance(var, Dictionary):
-        for k, v in var.items():
+        for k, v in list(_compat.iteritems(var)):
             if v.constant and not v.may_be_defined:
                 del var[k]
             else:

@@ -13,6 +13,7 @@ from jinja2 import nodes
 from ..model import Scalar, Dictionary, List, Unknown, Tuple
 from ..mergers import merge_rtypes, merge
 from ..exceptions import InvalidExpression, UnexpectedExpression, MergeException
+from .. import _compat
 from .util import visit_many
 
 
@@ -139,7 +140,7 @@ def visit_expr(ast, ctx):
     """
     visitor = expr_visitors.get(type(ast))
     if not visitor:
-        for node_cls, visitor_ in expr_visitors.iteritems():
+        for node_cls, visitor_ in _compat.iteritems(expr_visitors):
             if isinstance(ast, node_cls):
                 visitor = visitor_
     if not visitor:
@@ -165,7 +166,7 @@ def _visit_dict(ast, ctx, items):
             struct = merge(struct, key_struct)
             if isinstance(key, nodes.Const):
                 rtype[key.value] = value_rtype
-        elif isinstance(key, basestring):
+        elif isinstance(key, _compat.string_types):
             rtype[key] = value_rtype
     return rtype, struct
 
@@ -221,7 +222,7 @@ def visit_getitem(ast, ctx):
     if isinstance(arg, nodes.Const):
         if isinstance(arg.value, int):
             predicted_struct = List.from_ast(arg, ctx.get_predicted_struct())
-        elif isinstance(arg.value, basestring):
+        elif isinstance(arg.value, _compat.string_types):
             predicted_struct = Dictionary.from_ast(arg, {
                 arg.value: ctx.get_predicted_struct(label=arg.value),
             })
