@@ -24,6 +24,7 @@ setup(
     packages=['jinja2schema'],
     package_data={'': ['LICENSE']},
     include_package_data=True,
+    install_requires=['Jinja2>=2.2'],
     classifiers=[
         'License :: OSI Approved :: BSD License',
         'Topic :: Software Development :: Libraries' ,

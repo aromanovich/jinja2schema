@@ -8,14 +8,18 @@ A library for inferring types from `Jinja2`_ templates.
 .. code-block:: python
 
     >>> from jinja2schema import infer
-    >>> infer('{{ (x.a.b|first).name }}')
+    >>> s = infer('{{ (x.a.b|first).name }}')
+    >>> s
     {'x': {'a': {'b': [{'name': <scalar>}]}}
 
-    >>> infer('''
+    >>> s = infer('''
     ... {% for x in xs %}
     ...   {{ x }}
     ... {% endfor %}
-    ''').to_json_schema()
+    ''')
+    >>> s
+    {'xs': [<scalar>]}
+    >>> s.to_json_schema()
     {
         'type': 'object',
         'required': ['xs'],
@@ -48,7 +52,7 @@ License
 
 `BSD license`_
 
-
+.. _Jinja2: http://jinja.pocoo.org/docs/
 .. _Documentation: http://jinja2schema.rtfd.org/
 .. _GitHub: https://github.com/aromanovich/jinja2schema
-.. _BSD license: https://github.com/sigmavirus24/uritemplate/blob/master/LICENSE
+.. _BSD license: https://github.com/aromanovich/jinja2schema/blob/master/LICENSE
