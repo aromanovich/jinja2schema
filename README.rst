@@ -1,6 +1,9 @@
 jinja2schema
 ============
 
+.. image:: https://travis-ci.org/aromanovich/jinja2schema.svg?branch=master
+   :target: https://travis-ci.org/aromanovich/jinja2schema
+
 Documentation_ | GitHub_
 
 A library for inferring types from `Jinja2`_ templates.
