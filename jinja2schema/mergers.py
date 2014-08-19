@@ -29,9 +29,13 @@ def merge(fst, snd):
     elif isinstance(snd, Unknown):
         result = fst
     elif isinstance(fst, Scalar) and isinstance(snd, Scalar):
-        result = Scalar()
-        result.possible_types = fst.possible_types & snd.possible_types
-        if not result.possible_types:
+        fst_type = type(fst)
+        snd_type = type(snd)
+        if issubclass(fst_type, snd_type):
+            result = fst_type()
+        elif issubclass(snd_type, fst_type):
+            result = snd_type()
+        else:
             raise MergeException(fst, snd)
     elif isinstance(fst, Dictionary) and isinstance(snd, Dictionary):
         result = Dictionary()

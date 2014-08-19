@@ -54,8 +54,8 @@ def visit_stmt(ast, config):
 
 @visits_stmt(nodes.For)
 def visit_for(ast, config):
-    body_struct = visit_many(ast.body, config, predicted_struct_class=Scalar)
-    else_struct = visit_many(ast.else_, config, predicted_struct_class=Scalar)
+    body_struct = visit_many(ast.body, config, predicted_struct_cls=Scalar)
+    else_struct = visit_many(ast.else_, config, predicted_struct_cls=Scalar)
 
     if 'loop' in body_struct:
         # exclude a special `loop` variable from the body structure
@@ -86,8 +86,8 @@ def visit_if(ast, config):
     test_rtype, test_struct = visit_expr(ast.test, Context(
         return_struct_cls=Unknown,
         predicted_struct=Unknown.from_ast(ast.test)), config)
-    if_struct = visit_many(ast.body, config, predicted_struct_class=Scalar)
-    else_struct = visit_many(ast.else_, config, predicted_struct_class=Scalar) if ast.else_ else Dictionary()
+    if_struct = visit_many(ast.body, config, predicted_struct_cls=Scalar)
+    else_struct = visit_many(ast.else_, config, predicted_struct_cls=Scalar) if ast.else_ else Dictionary()
     struct = merge(merge(test_struct, if_struct), else_struct)
 
     if isinstance(ast.test, nodes.Test) and isinstance(ast.test.node, nodes.Name):
@@ -139,4 +139,4 @@ def visit_assign(ast, config):
 
 @visits_stmt(nodes.Output)
 def visit_output(ast, config):
-    return visit_many(ast.nodes, config, predicted_struct_class=Scalar)
+    return visit_many(ast.nodes, config, predicted_struct_cls=Scalar)

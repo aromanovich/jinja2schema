@@ -10,7 +10,7 @@ import functools
 
 from jinja2 import nodes
 
-from ..model import Scalar, Dictionary, List, Unknown, Tuple
+from ..model import Scalar, Dictionary, List, Unknown, Tuple, String, Number, Boolean
 from ..mergers import merge_rtypes, merge
 from ..exceptions import InvalidExpression, UnexpectedExpression, MergeException
 from .. import _compat
@@ -93,18 +93,14 @@ class Context(object):
 
         (instance of context.return_struct_cls, Dictionary({data: context.predicted_struct}})
     """
-    def __init__(self, ctx=None, return_struct_cls=None, return_struct_possible_types=None, predicted_struct=None):
+    def __init__(self, ctx=None, return_struct_cls=None, predicted_struct=None):
         self.predicted_struct = None
         self.return_struct_cls = Unknown
-        self.return_struct_possible_types = None
         if ctx:
             self.predicted_struct = ctx.predicted_struct
             self.return_struct_cls = ctx.return_struct_cls
-            self.return_struct_possible_types = ctx.return_struct_possible_types
         if predicted_struct:
             self.predicted_struct = predicted_struct
-        if return_struct_possible_types:
-            self.return_struct_possible_types = return_struct_possible_types
         if return_struct_cls:
             self.return_struct_cls = return_struct_cls
 
@@ -200,25 +196,21 @@ def visit_compare(ast, ctx, config):
     for op in ast.ops:
         op_rtype, op_struct = visit_expr(op.expr, ctx, config)
         struct = merge(struct, op_struct)
-    return Scalar.from_ast(ast, possible_types={'boolean'}), struct
+    return Boolean.from_ast(ast), struct
 
 
 @visits_expr(nodes.Slice)
 def visit_slice(ast, ctx, config):
     nodes = [node for node in [ast.start, ast.stop, ast.step] if node is not None]
     struct = visit_many(nodes, config,
-                                 predicted_struct_class=Scalar,
-                                 predicted_struct_possible_types={'number'},
-                                 return_struct_cls=Scalar,
-                                 return_struct_possible_types={'number'})
+                        predicted_struct_cls=Number,
+                        return_struct_cls=Number)
     return Unknown(), struct
 
 
 @visits_expr(nodes.Name)
 def visit_name(ast, ctx, config):
     kwargs = {}
-    if ctx.return_struct_cls is Scalar and ctx.return_struct_possible_types:
-        kwargs = {'possible_types': ctx.return_struct_possible_types}
     return ctx.return_struct_cls.from_ast(ast, **kwargs), Dictionary({
         ast.name: ctx.get_predicted_struct(label=ast.name)
     })
@@ -277,13 +269,13 @@ def visit_test(ast, ctx, config):
         predicted_struct = Unknown.from_ast(ast.node)
     else:
         raise InvalidExpression(ast, 'unknown test "{}"'.format(ast.name))
-    rtype, struct = visit_expr(ast.node, Context(return_struct_cls=Scalar, return_struct_possible_types={'boolean'},
+    rtype, struct = visit_expr(ast.node, Context(return_struct_cls=Boolean,
                                                  predicted_struct=predicted_struct), config)
     if ast.name == 'divisibleby':
         if not ast.args:
             raise InvalidExpression(ast, 'divisibleby must have an argument')
         _, arg_struct = visit_expr(ast.args[0],
-                                   Context(predicted_struct=Scalar.from_ast(ast.args[0], possible_types={'number'})), config)
+                                   Context(predicted_struct=Number.from_ast(ast.args[0])), config)
         struct = merge(arg_struct, struct)
     return rtype, struct
 
@@ -291,8 +283,8 @@ def visit_test(ast, ctx, config):
 @visits_expr(nodes.Concat)
 def visit_concat(ast, ctx, config):
     ctx.meet(Scalar(), ast)
-    return Scalar.from_ast(ast, possible_types={'string'}), \
-           visit_many(ast.nodes, config, predicted_struct_class=Scalar, predicted_struct_possible_types={'string'})
+    return String.from_ast(ast), \
+           visit_many(ast.nodes, config, predicted_struct_cls=String)
 
 
 @visits_expr(nodes.CondExpr)
@@ -317,9 +309,9 @@ def visit_call(ast, ctx, config):
             struct = Dictionary()
             for arg in ast.args:
                 arg_rtype, arg_struct = visit_expr(arg, Context(
-                    predicted_struct=Scalar.from_ast(arg, possible_types={'number'})), config)
+                    predicted_struct=Number.from_ast(arg)), config)
                 struct = merge(struct, arg_struct)
-            return List(Scalar(possible_types={'number'})), struct
+            return List(Number()), struct
         elif ast.node.name == 'lipsum':
             ctx.meet(Scalar(), ast)
             struct = Dictionary()
@@ -342,29 +334,29 @@ def visit_call(ast, ctx, config):
 
 @visits_expr(nodes.Filter)
 def visit_filter(ast, ctx, config):
-    return_struct_possible_types = None
+    return_struct_cls = None
     if ast.name in ('abs', 'striptags', 'capitalize', 'center', 'escape', 'filesizeformat',
                     'float', 'forceescape', 'format', 'indent', 'int', 'replace', 'round',
                     'safe', 'string', 'striptags', 'title', 'trim', 'truncate', 'upper',
                     'urlencode', 'urlize', 'wordcount', 'wordwrap', 'e'):
         ctx.meet(Scalar(), ast)
         if ast.name in ('abs', 'float', 'int', 'round', ):
-            node_struct = Scalar.from_ast(ast.node, possible_types={'number'})
-            return_struct_possible_types = {'number'}
+            node_struct = Number.from_ast(ast.node)
+            return_struct_cls = Number
         elif ast.name in ('striptags', 'capitalize', 'center', 'escape', 'forceescape', 'format', 'indent',
                           'replace', 'safe', 'title', 'trim', 'truncate', 'upper', 'urlencode',
                           'urliize', 'wordwrap', 'e'):
-            node_struct = Scalar.from_ast(ast.node, possible_types={'string'})
-            return_struct_possible_types = {'string'}
+            node_struct = String.from_ast(ast.node)
+            return_struct_cls = String
         elif ast.name == 'filesizeformat':
-            node_struct = Scalar.from_ast(ast.node, possible_types={'number'})
-            return_struct_possible_types = {'string'}
+            node_struct = Number.from_ast(ast.node)
+            return_struct_cls = String
         elif ast.name == 'string':
             node_struct = Scalar.from_ast(ast.node)
-            return_struct_possible_types = {'string'}
+            return_struct_cls = String
         elif ast.name == 'wordcount':
-            node_struct = Scalar.from_ast(ast.node, possible_types={'string'})
-            return_struct_possible_types = {'number'}
+            node_struct = String.from_ast(ast.node)
+            return_struct_cls = Number
         else:
             node_struct = Scalar.from_ast(ast.node)
     elif ast.name in ('batch', 'slice'):
@@ -386,10 +378,9 @@ def visit_filter(ast, ctx, config):
         node_struct = Dictionary.from_ast(ast.node)
     elif ast.name == 'join':
         ctx.meet(Scalar(), ast)
-        node_struct = List.from_ast(ast.node, Scalar(possible_types={'string'}))
+        node_struct = List.from_ast(ast.node, String())
         rtype, struct = visit_expr(ast.node, Context(
-            return_struct_cls=ctx.return_struct_cls,
-            return_struct_possible_types={'string'},
+            return_struct_cls=String,
             predicted_struct=node_struct
         ), config)
         arg_rtype, arg_struct = visit_expr(ast.args[0], Context(predicted_struct=Scalar.from_ast(ast.args[0])), config)
@@ -426,12 +417,12 @@ def visit_filter(ast, ctx, config):
         raise InvalidExpression(ast, 'attr filter is not supported')
     else:
         raise InvalidExpression(ast, 'unknown filter')
-
-    return visit_expr(ast.node, Context(
+    rv = visit_expr(ast.node, Context(
         ctx=ctx,
-        return_struct_possible_types=return_struct_possible_types,
+        return_struct_cls=return_struct_cls,
         predicted_struct=node_struct
     ), config)
+    return rv
 
 
 # :class:`nodes.Literal` visitors
@@ -446,11 +437,11 @@ def visit_const(ast, ctx, config):
     ctx.meet(Scalar(), ast)
     possible_types = None
     if isinstance(ast.value, _compat.string_types):
-        possible_types = {'string'}
+        return String.from_ast(ast, constant=True), Dictionary()
     elif isinstance(ast.value, (int, float, complex)):
-        possible_types = {'number'}
+        return Number.from_ast(ast, constant=True), Dictionary()
     elif isinstance(ast.value, bool):
-        possible_types = {'boolean'}
+        return Boolean.from_ast(ast, constant=True), Dictionary()
     elif ast.value is None:
         possible_types = {'null'}
     return Scalar.from_ast(ast, possible_types=possible_types, constant=True), Dictionary()

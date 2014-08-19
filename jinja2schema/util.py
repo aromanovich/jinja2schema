@@ -7,11 +7,8 @@ from .model import Dictionary, Scalar, List, Unknown, Tuple
 
 
 def _format_attrs(var):
-    rv = (u'label={0.label}, required={0.required}, '
-          u'constant={0.constant}, linenos={0.linenos}').format(var).encode('utf-8')
-    if isinstance(var, Scalar):
-        rv += u', possible_types={0.possible_types}'.format(var).encode('utf-8')
-    return rv
+    return (u'label={0.label}, required={0.required}, '
+            u'constant={0.constant}, linenos={0.linenos}').format(var).encode('utf-8')
 
 
 def _indent(lines, spaces):
@@ -45,7 +42,7 @@ def _debug_repr(var):
             rv.extend(_indent(_debug_repr(var.item), spaces=4))
             rv.append(')')
     elif isinstance(var, Scalar):
-        rv = ['Scalar({})'.format(_format_attrs(var))]
+        rv = ['{}({})'.format(var.__class__.__name__, _format_attrs(var))]
     elif isinstance(var, Unknown):
         rv = ['Unknown({})'.format(_format_attrs(var))]
     return rv

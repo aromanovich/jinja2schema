@@ -4,7 +4,7 @@ from jinja2 import nodes
 
 from jinja2schema.core import infer
 from jinja2schema.exceptions import MergeException, UnexpectedExpression
-from jinja2schema.model import List, Dictionary, Scalar, Unknown
+from jinja2schema.model import List, Dictionary, Scalar, Unknown, String
 
 
 def test_may_be_defined():
@@ -23,9 +23,9 @@ def test_may_be_defined():
     '''
     struct = infer(template)
     expected_struct = Dictionary({
-        'x': Scalar(linenos=[2, 3, 5], label='x', possible_types={'string'},
+        'x': String(linenos=[2, 3, 5], label='x',
                     constant=False, may_be_defined=True),
-        'y': Scalar(linenos=[7, 10, 12], label='y', possible_types={'string'},
+        'y': String(linenos=[7, 10, 12], label='y',
                     constant=False, may_be_defined=True),
     })
     assert struct == expected_struct
@@ -39,7 +39,7 @@ def test_may_be_defined():
     '''
     struct = infer(template)
     expected_struct = Dictionary({
-        'x': Scalar(linenos=[2, 3, 4, 6], label='x', possible_types={'string'},
+        'x': String(linenos=[2, 3, 4, 6], label='x',
                     constant=False, may_be_defined=False),
     })
     assert struct == expected_struct
@@ -119,7 +119,7 @@ def test_basics_3():
     '''
     struct = infer(template)
     expected_struct = Dictionary({
-        'x': Scalar(label='x', possible_types={'string'}, linenos=[2, 3, 5, 7]),
+        'x': String(label='x', linenos=[2, 3, 5, 7]),
     })
     assert struct == expected_struct
 
@@ -156,10 +156,10 @@ def test_basics_4():
     '''
     struct = infer(template)
     expected_struct = Dictionary({
-        'configuration': Scalar(label='configuration', possible_types={'string'},
+        'configuration': String(label='configuration',
                                 may_be_defined=True, constant=False, linenos=[6, 7]),
         'queue': Scalar(label='queue', may_be_defined=True, constant=False, linenos=[9]),
-        'timestamp': Scalar(label='timestamp', possible_types={'string'}, constant=False, linenos=[7])
+        'timestamp': String(label='timestamp', constant=False, linenos=[7])
     })
     assert struct == expected_struct
 
@@ -266,9 +266,9 @@ def test_basics_11():
     struct = infer(template)
     expected_struct = Dictionary({
         'a': Dictionary({
-            'attr1': List(Scalar(possible_types={'string'}), label='attr1', linenos=[3]),
+            'attr1': List(String(), label='attr1', linenos=[3]),
             'attr2': List(Scalar(linenos=[4]), label='attr2', linenos=[4], used_with_default=True),
-            'attr3': Scalar(label='attr3', possible_types={'string'}, linenos=[5], used_with_default=True)
+            'attr3': String(label='attr3', linenos=[5], used_with_default=True)
         }, label='a', linenos=[2, 3, 4, 5]),
         'xs': List(
             Scalar(label='x', linenos=[7]),  # TODO it should be Dictionary({'is_active': Unknown()})

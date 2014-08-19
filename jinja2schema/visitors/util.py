@@ -9,36 +9,28 @@ from ..mergers import merge
 from ..model import Dictionary, Scalar, Unknown
 
 
-def visit(node, config, predicted_struct_class=Scalar, return_struct_cls=Unknown, return_struct_possible_types=None,
-          predicted_struct_possible_types=None):
+def visit(node, config, predicted_struct_cls=Scalar, return_struct_cls=Unknown):
     if isinstance(node, jinja2.nodes.Stmt):
         structure = visit_stmt(node, config)
     elif isinstance(node, jinja2.nodes.Expr):
-        ctx = Context(predicted_struct=predicted_struct_class.from_ast(node, possible_types=predicted_struct_possible_types),
-                      return_struct_cls=return_struct_cls,
-                      return_struct_possible_types=return_struct_possible_types)
+        ctx = Context(predicted_struct=predicted_struct_cls.from_ast(node), return_struct_cls=return_struct_cls)
         _, structure = visit_expr(node, ctx, config)
     elif isinstance(node, jinja2.nodes.Template):
         structure = visit_many(node.body, config)
     return structure
 
 
-def visit_many(nodes, config, predicted_struct_class=Scalar,
-               return_struct_cls=Unknown, return_struct_possible_types=None, predicted_struct_possible_types=None):
+def visit_many(nodes, config, predicted_struct_cls=Scalar, return_struct_cls=Unknown):
     """Visits ``nodes`` and merges results.
 
     :param nodes: list of :class:`jinja2.nodes.Node`
-    :param predicted_struct_class: ``predicted_struct`` for expression visitors will be constructed
+    :param predicted_struct_cls: ``predicted_struct`` for expression visitors will be constructed
                                    using this class by calling :meth:`from_ast` method
     :return: :class:`Dictionary`
     """
     rv = Dictionary()
     for node in nodes:
-        structure = visit(node, config,
-                          predicted_struct_class=predicted_struct_class,
-                          return_struct_cls=return_struct_cls,
-                          return_struct_possible_types=return_struct_possible_types,
-                          predicted_struct_possible_types=predicted_struct_possible_types)
+        structure = visit(node, config, predicted_struct_cls=predicted_struct_cls, return_struct_cls=return_struct_cls)
         rv = merge(rv, structure)
     return rv
 

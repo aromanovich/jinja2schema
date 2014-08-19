@@ -7,7 +7,7 @@ from jinja2schema.core import parse
 from jinja2schema.visitors.expr import (Context, visit_getitem, visit_cond_expr, visit_test,
                                         visit_getattr, visit_compare, visit_filter, visit_call, visit_dict)
 from jinja2schema.exceptions import UnexpectedExpression, InvalidExpression
-from jinja2schema.model import Dictionary, Scalar, List, Unknown
+from jinja2schema.model import Dictionary, Scalar, List, Unknown, String, Number, Boolean
 from jinja2schema.util import debug_repr
 
 
@@ -89,7 +89,7 @@ def test_getattr_3():
             linenos=[1]
         ),
         'z': Scalar(label='z', linenos=[1]),
-        'n': Scalar(label='n', possible_types={'number'}, linenos=[2])
+        'n': Number(label='n', linenos=[2])
     })
     assert struct == expected_struct
 
@@ -161,7 +161,7 @@ def test_filter_1():
     rtype, struct = visit_filter(ast, get_context(ast), config)
 
     expected_struct = Dictionary({
-        'x': Scalar(label='x', possible_types={'string'}, linenos=[1]),
+        'x': String(label='x', linenos=[1]),
     })
     assert struct == expected_struct
 
@@ -179,7 +179,7 @@ def test_filter_3():
     rtype, struct = visit_filter(ast, get_context(ast), config)
 
     expected_struct = Dictionary({
-        'x': Scalar(label='x', linenos=[1], possible_types={'string'}, used_with_default=True),
+        'x': String(label='x', linenos=[1], used_with_default=True),
     })
     assert struct == expected_struct
 
@@ -225,25 +225,31 @@ def test_filter_7():
 def test_filter_8():
     ast = parse('{{ x|abs }}').find(nodes.Filter)
     rtype, struct = visit_filter(ast, get_context(ast), config)
-    assert rtype == Scalar(label='x', linenos=[1], possible_types={'number'})
+    assert rtype == Number(label='x', linenos=[1])
     assert struct == Dictionary({
-        'x': Scalar(label='x', linenos=[1], possible_types={'number'})
+        'x': Number(label='x', linenos=[1])
     })
 
     ast = parse('{{ x|striptags }}').find(nodes.Filter)
     rtype, struct = visit_filter(ast, get_context(ast), config)
-    assert rtype == Scalar(label='x', linenos=[1], possible_types={'string'})
+    assert rtype == String(label='x', linenos=[1])
     assert struct == Dictionary({
-        'x': Scalar(label='x', linenos=[1], possible_types={'string'})
+        'x': String(label='x', linenos=[1])
     })
 
     ast = parse('{{ x|wordcount }}').find(nodes.Filter)
     rtype, struct = visit_filter(ast, get_context(ast), config)
-    assert rtype == Scalar(label='x', linenos=[1], possible_types={'number'})
+    assert rtype == Number(label='x', linenos=[1])
     assert struct == Dictionary({
-        'x': Scalar(label='x', linenos=[1], possible_types={'string'})
+        'x': String(label='x', linenos=[1])
     })
 
+    ast = parse('{{ xs|join("|") }}').find(nodes.Filter)
+    rtype, struct = visit_filter(ast, get_context(ast), config)
+    assert rtype == String(label='xs', linenos=[1])
+    assert struct == Dictionary({
+        'xs': List(String(), label='xs', linenos=[1])
+    })
 
 def test_slice():
     template = '''{{ xs[a:2:b] }}'''
@@ -251,8 +257,8 @@ def test_slice():
     rtype, struct = visit_getitem(ast, get_context(ast), config)
     assert struct == Dictionary({
         'xs': List(Scalar(linenos=[1]), label='xs', linenos=[1]),
-        'a': Scalar(label='a', possible_types={'number'}, linenos=[1]),
-        'b': Scalar(label='b', possible_types={'number'}, linenos=[1]),
+        'a': Number(label='a', linenos=[1]),
+        'b': Number(label='b', linenos=[1]),
     })
 
 
@@ -264,7 +270,7 @@ def test_test_1():
     expected_struct = Dictionary({
         'x': Scalar(label='x', linenos=[1]),
         'data': Dictionary({
-            'field': Scalar(label='field', possible_types={'number'}, linenos=[1]),
+            'field': Number(label='field', linenos=[1]),
         }, label='data', linenos=[1])
     })
 
@@ -298,8 +304,16 @@ def test_call_dict():
         call_ast, Context(predicted_struct=Unknown.from_ast(call_ast)), config)
     expected_rtype = Dictionary({
         'x': Dictionary({
-            'a': Scalar(linenos=[3], possible_types={'number'}, constant=True),
-            'b': Scalar(linenos=[3], possible_types={'number'}, constant=True)
+            'a': Number(linenos=[3], constant=True),
+            'b': Number(linenos=[3], constant=True)
         }, linenos=[2], constant=True)
     }, linenos=[1], constant=True)
+    assert rtype == expected_rtype
+
+
+def test_compare():
+    template = '''{{ a < c }}'''
+    compare_ast = parse(template).find(nodes.Compare)
+    rtype, struct = visit_compare(compare_ast, get_context(compare_ast), config)
+    expected_rtype = Boolean(linenos=[1])
     assert rtype == expected_rtype

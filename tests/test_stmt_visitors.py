@@ -6,7 +6,7 @@ from jinja2schema.config import Config
 from jinja2schema.core import parse, infer_from_ast
 from jinja2schema.visitors.stmt import visit_assign, visit_if, visit_for
 from jinja2schema.exceptions import MergeException, UnexpectedExpression
-from jinja2schema.model import Dictionary, Scalar, List, Unknown, Tuple
+from jinja2schema.model import Dictionary, Scalar, List, Unknown, Tuple, String, Number
 
 
 config = Config()
@@ -87,7 +87,7 @@ def test_assign_2():
 
     struct = visit_assign(ast, config)
     expected_struct = Dictionary({
-        'y': Scalar(label='y', possible_types={'string'}, linenos=[1])
+        'y': String(label='y', linenos=[1])
     })
     assert struct == expected_struct
 
@@ -105,9 +105,9 @@ def test_assign_4():
 
     struct = visit_assign(ast, config)
     expected_struct = Dictionary({
-        'a': Scalar(label='a', linenos=[1], possible_types={'number'}, constant=True),
+        'a': Number(label='a', linenos=[1], constant=True),
         'b': Dictionary(data={
-            'gsom': Scalar(linenos=[1], possible_types={'string'}, constant=True),
+            'gsom': String(linenos=[1], constant=True),
         }, label='b', linenos=[1], constant=True),
         'z': Scalar(label='z', linenos=[1]),
     })
@@ -125,9 +125,9 @@ def test_assign_5():
     struct = visit_assign(ast, config)
     expected_struct = Dictionary({
         'weights': List(Tuple([
-            Scalar(linenos=[3, 4], possible_types={'string'}, constant=True),
+            String(linenos=[3, 4], constant=True),
             Dictionary({
-                'data': Scalar(linenos=[3, 4], possible_types={'number'}, constant=True)
+                'data': Number(linenos=[3, 4], constant=True)
             }, linenos=[3, 4], constant=True),
         ], linenos=[3, 4], constant=True), label='weights', linenos=[2], constant=True)
     })
