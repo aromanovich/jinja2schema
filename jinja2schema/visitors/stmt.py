@@ -10,7 +10,7 @@ import functools
 
 from jinja2 import nodes
 
-from ..model import Scalar, Dictionary, List, Unknown, Tuple
+from ..model import Scalar, Dictionary, List, Unknown, Tuple, Boolean
 from ..mergers import merge
 from ..exceptions import InvalidExpression
 from .. import _compat
@@ -83,9 +83,12 @@ def visit_for(ast, config):
 
 @visits_stmt(nodes.If)
 def visit_if(ast, config):
-    test_rtype, test_struct = visit_expr(ast.test, Context(
-        return_struct_cls=Unknown,
-        predicted_struct=Unknown.from_ast(ast.test)), config)
+    if config.ALLOW_ONLY_BOOLEAN_VARIABLES_IN_TEST:
+        test_predicted_struct = Boolean.from_ast(ast.test)
+    else:
+        test_predicted_struct = Unknown.from_ast(ast.test)
+    test_rtype, test_struct = visit_expr(
+        ast.test, Context(return_struct_cls=Unknown, predicted_struct=test_predicted_struct), config)
     if_struct = visit_many(ast.body, config, predicted_struct_cls=Scalar)
     else_struct = visit_many(ast.else_, config, predicted_struct_cls=Scalar) if ast.else_ else Dictionary()
     struct = merge(merge(test_struct, if_struct), else_struct)

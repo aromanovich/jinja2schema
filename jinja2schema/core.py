@@ -40,6 +40,8 @@ def infer_from_ast(ast, ignore_constants=True, config=Config()):
     :param ast: AST
     :type ast: :class:`jinja2.nodes.Node`
     :param ignore_constants: excludes constant variables from a resulting structure
+    :param config: a config
+    :type config: :class:`.config.Config`
     :rtype: :class:`.model.Dictionary`
     :raises: :class:`.exceptions.MergeException`, :class:`.exceptions.InvalidExpression`,
              :class:`.exceptions.UnexpectedExpression`
@@ -55,6 +57,8 @@ def infer(template, config=Config()):
 
     :param template: a template
     :type template: string
+    :param config: a config
+    :type config: :class:`.config.Config`
     :rtype: :class:`.model.Dictionary`
     :raises: :class:`.exceptions.MergeException`, :class:`.exceptions.InvalidExpression`,
              :class:`.exceptions.UnexpectedExpression`

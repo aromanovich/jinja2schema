@@ -289,7 +289,11 @@ def visit_concat(ast, ctx, config):
 
 @visits_expr(nodes.CondExpr)
 def visit_cond_expr(ast, ctx, config):
-    test_rtype, test_struct = visit_expr(ast.test, Context(predicted_struct=Unknown.from_ast(ast.test)), config)
+    if config.ALLOW_ONLY_BOOLEAN_VARIABLES_IN_TEST:
+        test_predicted_struct = Boolean.from_ast(ast.test)
+    else:
+        test_predicted_struct = Unknown.from_ast(ast.test)
+    test_rtype, test_struct = visit_expr(ast.test, Context(predicted_struct=test_predicted_struct), config)
     if_rtype, if_struct = visit_expr(ast.expr1, ctx, config)
     else_rtype, else_struct = visit_expr(ast.expr2, ctx, config)
     struct = merge(merge(if_struct, test_struct), else_struct)

@@ -114,8 +114,8 @@ jinja2schema logic based on the following common sense assumptions.
 
 .. note::
 
-    This list is not exhausting and is a subject to change. Probably some of these "config" will be customizable
-    at some point in the future.
+    This list is not exhausting and is a subject to change. Some of these "axioms" probably
+    will be customizable at some point in the future.
 
 * If ``x`` is printed (``{{ x }}``), ``x`` is a scalar: a string, a number or a boolean;
 * If ``x`` is used as an iterable in for loop (``{% for item in x %}``), used with
@@ -160,6 +160,8 @@ To infer types from a template, simply call :func:`jinja2schema.infer`.
 
 It will return a :class:`.model.Variable` instance, which can be converted to
 JSON schema using it's :meth:`.model.Variable.to_json_schema` method.
+
+:func:`infer` logic can be tuned by specifying a custom :class:`jinja2schema.config.Config`.
 
 If you need more than that, please take a look at :ref:`internals`.
 

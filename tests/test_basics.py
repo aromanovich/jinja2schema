@@ -1,10 +1,11 @@
 # coding: utf-8
 import pytest
 from jinja2 import nodes
+from jinja2schema.config import Config
 
 from jinja2schema.core import infer
 from jinja2schema.exceptions import MergeException, UnexpectedExpression
-from jinja2schema.model import List, Dictionary, Scalar, Unknown, String
+from jinja2schema.model import List, Dictionary, Scalar, Unknown, String, Boolean
 
 
 def test_may_be_defined():
@@ -376,5 +377,30 @@ def test_just_test():
         'foo': Unknown(label='foo', linenos=[2]),
         'zork': Unknown(label='zork', linenos=[4]),
         'sep': Scalar(label='sep', linenos=[5])
+    })
+    assert struct == expected_struct
+
+
+def test_allow_only_boolean_in_test_setting():
+    template = '''
+    {% if x %}
+        Hello!
+    {% endif %}
+    {{ 'Hello!' if y else '' }}
+    '''
+    config_1 = Config()
+    struct = infer(template, config_1)
+    expected_struct = Dictionary({
+        'x': Unknown(label='x', linenos=[2]),
+        'y': Unknown(label='y', linenos=[5]),
+    })
+    assert struct == expected_struct
+
+    config_2 = Config()
+    config_2.ALLOW_ONLY_BOOLEAN_VARIABLES_IN_TEST = True
+    struct = infer(template, config_2)
+    expected_struct = Dictionary({
+        'x': Boolean(label='x', linenos=[2]),
+        'y': Boolean(label='y', linenos=[5]),
     })
     assert struct == expected_struct
