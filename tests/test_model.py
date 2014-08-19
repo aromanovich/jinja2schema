@@ -1,5 +1,5 @@
 # coding: utf-8
-from jinja2schema.model import Dictionary, Scalar, List, Unknown, Tuple
+from jinja2schema.model import Dictionary, Scalar, List, Unknown, Tuple, Number, Boolean, String
 
 
 def test_to_json_schema():
@@ -14,6 +14,9 @@ def test_to_json_schema():
             label='list', linenos=[2]
         ),
         'x': Unknown(may_be_defined=True),
+        'number_var': Number(),
+        'string_var': String(),
+        'boolean_var': Boolean(),
     })
     scalar_anyof = [
         {'type': 'boolean'},
@@ -32,7 +35,7 @@ def test_to_json_schema():
 
     assert expected_struct.to_json_schema() == {
         'type': 'object',
-        'required': ['list'],
+        'required': ['string_var', 'list', 'boolean_var', 'number_var'],
         'properties': {
             'list': {
                 'title': 'list',
@@ -57,6 +60,15 @@ def test_to_json_schema():
             },
             'x': {
                 'anyOf': unknown_anyof,
+            },
+            'number_var': {
+                'type': 'number',
+            },
+            'string_var': {
+                'type': 'string',
+            },
+            'boolean_var': {
+                'type': 'boolean',
             },
         },
     }

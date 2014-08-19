@@ -256,14 +256,6 @@ class Tuple(Variable):
 
 class Scalar(Variable):
     """A scalar. Either string, number, boolean or ``None``."""
-    TYPES = {'string', 'number', 'boolean', 'null'}
-
-    def __init__(self, *args, **kwargs):
-        super(Scalar, self).__init__(*args, **kwargs)
-
-    def __eq__(self, other):
-        return super(Scalar, self).__eq__(other)
-
     def __repr__(self):
         return '<scalar>'
 
@@ -280,50 +272,33 @@ class Scalar(Variable):
 
 class String(Scalar):
     """A string."""
-    def __init__(self, *args, **kwargs):
-        super(String, self).__init__(*args, **kwargs)
-
-    def __eq__(self, other):
-        return super(String, self).__eq__(other)
-
     def __repr__(self):
         return '<string>'
 
     def to_json_schema(self):
-        rv = super(Scalar, self).to_json_schema()
+        rv = Variable.to_json_schema(self)
         rv['type'] = 'string'
         return rv
 
+
 class Number(Scalar):
     """A number."""
-    def __init__(self, *args, **kwargs):
-        super(Number, self).__init__(*args, **kwargs)
-
-    def __eq__(self, other):
-        return super(Number, self).__eq__(other)
-
     def __repr__(self):
         return '<number>'
 
     def to_json_schema(self):
-        rv = super(Number, self).to_json_schema()
+        rv = Variable.to_json_schema(self)
         rv['type'] = 'number'
         return rv
 
 
 class Boolean(Scalar):
     """A number."""
-    def __init__(self, *args, **kwargs):
-        super(Boolean, self).__init__(*args, **kwargs)
-
-    def __eq__(self, other):
-        return super(Boolean, self).__eq__(other)
-
     def __repr__(self):
         return '<boolean>'
 
     def to_json_schema(self):
-        rv = super(Boolean, self).to_json_schema()
+        rv = Variable.to_json_schema(self)
         rv['type'] = 'boolean'
         return rv
 
@@ -335,14 +310,12 @@ class Unknown(Variable):
 
     def to_json_schema(self):
         rv = super(Unknown, self).to_json_schema()
-        rv.update({
-            'anyOf':  [
-                {'type': 'object'},
-                {'type': 'array'},
-                {'type': 'string'},
-                {'type': 'number'},
-                {'type': 'boolean'},
-                {'type': 'null'},
-            ],
-        })
+        rv['anyOf'] = [
+            {'type': 'object'},
+            {'type': 'array'},
+            {'type': 'string'},
+            {'type': 'number'},
+            {'type': 'boolean'},
+            {'type': 'null'},
+        ]
         return rv
