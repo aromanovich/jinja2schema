@@ -231,9 +231,9 @@ def visit_getitem(ast, ctx, config):
     arg = ast.arg
     if isinstance(arg, nodes.Const):
         if isinstance(arg.value, int):
-            if config.VARIABLE_INDEXED_WITH_INTEGER_TYPE == 'list':
+            if config.TYPE_OF_VARIABLE_INDEXED_WITH_INTEGER_TYPE == 'list':
                 predicted_struct = List.from_ast(ast, ctx.get_predicted_struct())
-            elif config.VARIABLE_INDEXED_WITH_INTEGER_TYPE == 'dictionary':
+            elif config.TYPE_OF_VARIABLE_INDEXED_WITH_INTEGER_TYPE == 'dictionary':
                 predicted_struct = Dictionary.from_ast(ast, {
                     arg.value: ctx.get_predicted_struct(),
                 })
@@ -247,9 +247,9 @@ def visit_getitem(ast, ctx, config):
     elif isinstance(arg, nodes.Slice):
         predicted_struct = List.from_ast(ast, ctx.get_predicted_struct())
     else:
-        if config.VARIABLE_INDEXED_WITH_VARIABLE_TYPE == 'list':
+        if config.TYPE_OF_VARIABLE_INDEXED_WITH_VARIABLE_TYPE == 'list':
             predicted_struct = List.from_ast(ast, ctx.get_predicted_struct())
-        elif config.VARIABLE_INDEXED_WITH_VARIABLE_TYPE == 'dictionary':
+        elif config.TYPE_OF_VARIABLE_INDEXED_WITH_VARIABLE_TYPE == 'dictionary':
             predicted_struct = Dictionary.from_ast(ast)
 
     _, arg_struct = visit_expr(arg, Context(predicted_struct=Scalar.from_ast(arg)), config)

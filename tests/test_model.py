@@ -3,7 +3,7 @@ from jinja2schema.model import Dictionary, Scalar, List, Unknown, Tuple, Number,
 
 
 def test_to_json_schema():
-    expected_struct = Dictionary({
+    struct = Dictionary({
         'list': List(
             Tuple((
                 Dictionary({
@@ -33,42 +33,41 @@ def test_to_json_schema():
         {'type': 'null'},
     ]
 
-    assert expected_struct.to_json_schema() == {
-        'type': 'object',
-        'required': ['string_var', 'list', 'boolean_var', 'number_var'],
-        'properties': {
-            'list': {
-                'title': 'list',
+    json_schema = struct.to_json_schema()
+    assert json_schema['type'] == 'object'
+    assert set(json_schema['required']) == set(['string_var', 'list', 'boolean_var', 'number_var'])
+    assert json_schema['properties'] == {
+        'list': {
+            'title': 'list',
+            'type': 'array',
+            'items': {
                 'type': 'array',
-                'items': {
-                    'type': 'array',
-                    'items': [{
-                        'title': 'a',
-                        'type': 'object',
-                        'required': ['field'],
-                        'properties': {
-                            'field': {
-                                'anyOf': scalar_anyof,
-                                'title': 'field'
-                            }
-                        },
-                    }, {
-                        'title': 'b',
-                        'anyOf': scalar_anyof,
-                    }],
-                },
+                'items': [{
+                    'title': 'a',
+                    'type': 'object',
+                    'required': ['field'],
+                    'properties': {
+                        'field': {
+                            'anyOf': scalar_anyof,
+                            'title': 'field'
+                        }
+                    },
+                }, {
+                    'title': 'b',
+                    'anyOf': scalar_anyof,
+                }],
             },
-            'x': {
-                'anyOf': unknown_anyof,
-            },
-            'number_var': {
-                'type': 'number',
-            },
-            'string_var': {
-                'type': 'string',
-            },
-            'boolean_var': {
-                'type': 'boolean',
-            },
+        },
+        'x': {
+            'anyOf': unknown_anyof,
+        },
+        'number_var': {
+            'type': 'number',
+        },
+        'string_var': {
+            'type': 'string',
+        },
+        'boolean_var': {
+            'type': 'boolean',
         },
     }

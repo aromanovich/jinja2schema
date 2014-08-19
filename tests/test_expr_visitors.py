@@ -72,7 +72,7 @@ def test_getattr_3():
     template = '''{{ a[z][1:\nn][1].x }}'''
     ast = parse(template).find(nodes.Getattr)
     config = Config()
-    config.VARIABLE_INDEXED_WITH_VARIABLE_TYPE = 'list'
+    config.TYPE_OF_VARIABLE_INDEXED_WITH_VARIABLE_TYPE = 'list'
     rtype, struct = visit_getattr(ast, get_context(ast), config)
 
     expected_struct = Dictionary({
@@ -98,7 +98,7 @@ def test_getitem_1():
     template = '''{{ a['b']['c'][1]['d'][x] }}'''
     ast = parse(template).find(nodes.Getitem)
     config = Config()
-    config.VARIABLE_INDEXED_WITH_VARIABLE_TYPE = 'list'
+    config.TYPE_OF_VARIABLE_INDEXED_WITH_VARIABLE_TYPE = 'list'
     rtype, struct = visit_getitem(ast, get_context(ast), config)
 
     expected_struct = Dictionary({
@@ -118,7 +118,7 @@ def test_getitem_2():
     template = '''{{ a[z] }}'''
     ast = parse(template).find(nodes.Getitem)
     config = Config()
-    config.VARIABLE_INDEXED_WITH_VARIABLE_TYPE = 'dictionary'
+    config.TYPE_OF_VARIABLE_INDEXED_WITH_VARIABLE_TYPE = 'dictionary'
     rtype, struct = visit_getitem(ast, get_context(ast), config)
 
     expected_struct = Dictionary({
