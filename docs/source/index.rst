@@ -114,7 +114,7 @@ jinja2schema logic based on the following common sense assumptions.
 
 .. note::
 
-    This list is not exhausting and is a subject to change. Probably some of these "axioms" will be customizable
+    This list is not exhausting and is a subject to change. Probably some of these "config" will be customizable
     at some point in the future.
 
 * If ``x`` is printed (``{{ x }}``), ``x`` is a scalar: a string, a number or a boolean;

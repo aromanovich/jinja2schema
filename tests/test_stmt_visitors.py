@@ -2,10 +2,14 @@
 import pytest
 from jinja2 import nodes
 
+from jinja2schema.config import Config
 from jinja2schema.core import parse, infer_from_ast
 from jinja2schema.visitors.stmt import visit_assign, visit_if, visit_for
 from jinja2schema.exceptions import MergeException, UnexpectedExpression
 from jinja2schema.model import Dictionary, Scalar, List, Unknown, Tuple
+
+
+config = Config()
 
 
 def test_for_1():
@@ -15,7 +19,7 @@ def test_for_1():
     {% endfor %}
     '''
     ast = parse(template).find(nodes.For)
-    struct = visit_for(ast)
+    struct = visit_for(ast, config)
     expected_struct = Dictionary({
         'a': Dictionary({
             'b': List(Scalar(label='x', linenos=[3]), label='b', linenos=[2])
@@ -52,7 +56,7 @@ def test_for_3():
     {% endfor %}
     '''
     ast = parse(template).find(nodes.For)
-    struct = visit_for(ast)
+    struct = visit_for(ast, config)
 
     expected_struct = Dictionary({
         'list': List(Tuple((
@@ -69,7 +73,7 @@ def test_assign_1():
     template = '''{% set a = b %}'''
     ast = parse(template).find(nodes.Assign)
 
-    struct = visit_assign(ast)
+    struct = visit_assign(ast, config)
     expected_struct = Dictionary({
         'a': Unknown(label='a', linenos=[1], constant=True),
         'b': Unknown(label='b', linenos=[1]),
@@ -81,9 +85,9 @@ def test_assign_2():
     template = '''{% set y = "-" ~ y %}'''
     ast = parse(template).find(nodes.Assign)
 
-    struct = visit_assign(ast)
+    struct = visit_assign(ast, config)
     expected_struct = Dictionary({
-        'y': Scalar(label='y', linenos=[1])
+        'y': Scalar(label='y', possible_types={'string'}, linenos=[1])
     })
     assert struct == expected_struct
 
@@ -92,18 +96,18 @@ def test_assign_3():
     template = '''{% set a, b = {'a': 1, 'b': 2} %}'''
     ast = parse(template).find(nodes.Assign)
     with pytest.raises(UnexpectedExpression):
-        visit_assign(ast)
+        visit_assign(ast, config)
 
 
 def test_assign_4():
     template = '''{% set a, b = 1, {'gsom': 'gsom', z: z} %}'''
     ast = parse(template).find(nodes.Assign)
 
-    struct = visit_assign(ast)
+    struct = visit_assign(ast, config)
     expected_struct = Dictionary({
-        'a': Scalar(label='a', linenos=[1], constant=True),
+        'a': Scalar(label='a', linenos=[1], possible_types={'number'}, constant=True),
         'b': Dictionary(data={
-            'gsom': Scalar(linenos=[1], constant=True),
+            'gsom': Scalar(linenos=[1], possible_types={'string'}, constant=True),
         }, label='b', linenos=[1], constant=True),
         'z': Scalar(label='z', linenos=[1]),
     })
@@ -118,12 +122,12 @@ def test_assign_5():
     ] %}
     '''
     ast = parse(template).find(nodes.Assign)
-    struct = visit_assign(ast)
+    struct = visit_assign(ast, config)
     expected_struct = Dictionary({
         'weights': List(Tuple([
-            Scalar(linenos=[3, 4], constant=True),
+            Scalar(linenos=[3, 4], possible_types={'string'}, constant=True),
             Dictionary({
-                'data': Scalar(linenos=[3, 4], constant=True)
+                'data': Scalar(linenos=[3, 4], possible_types={'number'}, constant=True)
             }, linenos=[3, 4], constant=True),
         ], linenos=[3, 4], constant=True), label='weights', linenos=[2], constant=True)
     })
@@ -139,7 +143,7 @@ def test_assign_6():
     '''
     ast = parse(template).find(nodes.Assign)
     with pytest.raises(MergeException):
-        visit_assign(ast)
+        visit_assign(ast, config)
 
 
 def test_if_1():
@@ -150,7 +154,7 @@ def test_if_1():
     {% endif %}
     '''
     ast = parse(template).find(nodes.If)
-    struct = visit_if(ast)
+    struct = visit_if(ast, config)
 
     expected_struct = Dictionary({
         'z': Dictionary({

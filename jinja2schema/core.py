@@ -5,6 +5,7 @@ jinja2schema.core
 """
 import jinja2
 
+from .config import Config
 from .model import Dictionary
 from .visitors import visit
 from . import _compat
@@ -32,7 +33,7 @@ def _ignore_constants(var):
     return var
 
 
-def infer_from_ast(ast, ignore_constants=True):
+def infer_from_ast(ast, ignore_constants=True, config=Config()):
     """Returns a :class:`.model.Dictionary` which reflects a structure of variables used
     within ``ast``.
 
@@ -43,13 +44,13 @@ def infer_from_ast(ast, ignore_constants=True):
     :raises: :class:`.exceptions.MergeException`, :class:`.exceptions.InvalidExpression`,
              :class:`.exceptions.UnexpectedExpression`
     """
-    rv = visit(ast)
+    rv = visit(ast, config)
     if ignore_constants:
         rv = _ignore_constants(rv)
     return rv
 
 
-def infer(template):
+def infer(template, config=Config()):
     """Returns a :class:`.model.Dictionary` which reflects a structure of the context required by ``template``.
 
     :param template: a template
@@ -58,4 +59,4 @@ def infer(template):
     :raises: :class:`.exceptions.MergeException`, :class:`.exceptions.InvalidExpression`,
              :class:`.exceptions.UnexpectedExpression`
     """
-    return infer_from_ast(parse(template), ignore_constants=True)
+    return infer_from_ast(parse(template), config=config, ignore_constants=True)

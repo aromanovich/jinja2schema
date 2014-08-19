@@ -30,6 +30,9 @@ def merge(fst, snd):
         result = fst
     elif isinstance(fst, Scalar) and isinstance(snd, Scalar):
         result = Scalar()
+        result.possible_types = fst.possible_types & snd.possible_types
+        if not result.possible_types:
+            raise MergeException(fst, snd)
     elif isinstance(fst, Dictionary) and isinstance(snd, Dictionary):
         result = Dictionary()
         for k in set(itertools.chain(fst.iterkeys(), snd.iterkeys())):

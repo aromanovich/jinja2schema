@@ -256,19 +256,26 @@ class Tuple(Variable):
 
 class Scalar(Variable):
     """A scalar. Either string, number, boolean or ``None``."""
+    TYPES = {'string', 'number', 'boolean', 'null'}
+
+    def __init__(self, *args, **kwargs):
+        self.possible_types = kwargs.pop('possible_types', set(self.TYPES))
+        super(Scalar, self).__init__(*args, **kwargs)
+
+    def __eq__(self, other):
+        return super(Scalar, self).__eq__(other) and self.possible_types == other.possible_types
+
     def __repr__(self):
         return '<scalar>'
 
     def to_json_schema(self):
         rv = super(Scalar, self).to_json_schema()
-        rv.update({
-            'anyOf':  [
-                {'type': 'string'},
-                {'type': 'number'},
-                {'type': 'boolean'},
-                {'type': 'null'},
-            ],
-        })
+        if len(self.possible_types) == 1:
+            rv['type'] = iter(self.possible_types).next()
+        else:
+            assert len(self.possible_types) > 0
+            # sort possible types to make asserts in tests simpler
+            rv['anyOf'] = [{'type': type} for type in sorted(self.possible_types)]
         return rv
 
 

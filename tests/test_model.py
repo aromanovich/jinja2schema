@@ -16,10 +16,10 @@ def test_to_json_schema():
         'x': Unknown(may_be_defined=True),
     })
     scalar_anyof = [
-        {'type': 'string'},
-        {'type': 'number'},
         {'type': 'boolean'},
         {'type': 'null'},
+        {'type': 'number'},
+        {'type': 'string'},
     ]
     unknown_anyof = [
         {'type': 'object'},

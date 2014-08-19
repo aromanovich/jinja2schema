@@ -29,14 +29,14 @@ def visits_stmt(node_cls):
     def decorator(func):
         stmt_visitors[node_cls] = func
         @functools.wraps(func)
-        def wrapped_func(ast):
+        def wrapped_func(ast, config):
             assert isinstance(ast, node_cls)
-            return func(ast)
+            return func(ast, config)
         return wrapped_func
     return decorator
 
 
-def visit_stmt(ast):
+def visit_stmt(ast, config):
     """Returns a structure of ``ast``.
 
     :param ast: instance of :class:`jinja2.nodes.Stmt`
@@ -49,13 +49,13 @@ def visit_stmt(ast):
                 visitor = visitor_
     if not visitor:
         raise Exception('stmt visitor for {} is not found'.format(type(ast)))
-    return visitor(ast)
+    return visitor(ast, config)
 
 
 @visits_stmt(nodes.For)
-def visit_for(ast):
-    body_struct = visit_many(ast.body, Scalar)
-    else_struct = visit_many(ast.else_, Scalar)
+def visit_for(ast, config):
+    body_struct = visit_many(ast.body, config, predicted_struct_class=Scalar)
+    else_struct = visit_many(ast.else_, config, predicted_struct_class=Scalar)
 
     if 'loop' in body_struct:
         # exclude a special `loop` variable from the body structure
@@ -73,7 +73,8 @@ def visit_for(ast):
         ast.iter,
         Context(
             return_struct_cls=Unknown,
-            predicted_struct=List.from_ast(ast, target_struct)))
+            predicted_struct=List.from_ast(ast, target_struct)),
+        config)
 
     merge(iter_rtype, List(target_struct))
 
@@ -81,12 +82,12 @@ def visit_for(ast):
 
 
 @visits_stmt(nodes.If)
-def visit_if(ast):
+def visit_if(ast, config):
     test_rtype, test_struct = visit_expr(ast.test, Context(
         return_struct_cls=Unknown,
-        predicted_struct=Unknown.from_ast(ast.test)))
-    if_struct = visit_many(ast.body, Scalar)
-    else_struct = visit_many(ast.else_, Scalar) if ast.else_ else Dictionary()
+        predicted_struct=Unknown.from_ast(ast.test)), config)
+    if_struct = visit_many(ast.body, config, predicted_struct_class=Scalar)
+    else_struct = visit_many(ast.else_, config, predicted_struct_class=Scalar) if ast.else_ else Dictionary()
     struct = merge(merge(test_struct, if_struct), else_struct)
 
     if isinstance(ast.test, nodes.Test) and isinstance(ast.test.node, nodes.Name):
@@ -102,7 +103,7 @@ def visit_if(ast):
 
 
 @visits_stmt(nodes.Assign)
-def visit_assign(ast):
+def visit_assign(ast, config):
     struct = Dictionary()
     if (isinstance(ast.target, nodes.Name) or
             (isinstance(ast.target, nodes.Tuple) and isinstance(ast.node, nodes.Tuple))):
@@ -116,7 +117,7 @@ def visit_assign(ast):
             for name_ast, var_ast in _compat.izip(ast.target.items, ast.node.items):
                 variables.append((name_ast.name, var_ast))
         for var_name, var_ast in variables:
-            var_rtype, var_struct = visit_expr(var_ast, Context(predicted_struct=Unknown.from_ast(var_ast)))
+            var_rtype, var_struct = visit_expr(var_ast, Context(predicted_struct=Unknown.from_ast(var_ast)), config)
             var_rtype.constant = True
             var_rtype.label = var_name
             struct = merge(merge(struct, var_struct), Dictionary({
@@ -130,12 +131,12 @@ def visit_assign(ast):
             tuple_items.append(var_struct)
             struct = merge(struct, Dictionary({name_ast.name: var_struct}))
         var_rtype, var_struct = visit_expr(
-            ast.node, Context(return_struct_cls=Unknown, predicted_struct=Tuple(tuple_items)))
+            ast.node, Context(return_struct_cls=Unknown, predicted_struct=Tuple(tuple_items)), config)
         return merge(struct, var_struct)
     else:
         raise InvalidExpression(ast, 'unsupported assignment')
 
 
 @visits_stmt(nodes.Output)
-def visit_output(ast):
-    return visit_many(ast.nodes, Scalar)
+def visit_output(ast, config):
+    return visit_many(ast.nodes, config, predicted_struct_class=Scalar)

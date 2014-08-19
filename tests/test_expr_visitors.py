@@ -2,11 +2,16 @@
 import pytest
 from jinja2 import nodes
 
+from jinja2schema.config import Config
 from jinja2schema.core import parse
 from jinja2schema.visitors.expr import (Context, visit_getitem, visit_cond_expr, visit_test,
-                                        visit_getattr, visit_compare, visit_filter, visit_call)
+                                        visit_getattr, visit_compare, visit_filter, visit_call, visit_dict)
 from jinja2schema.exceptions import UnexpectedExpression, InvalidExpression
 from jinja2schema.model import Dictionary, Scalar, List, Unknown
+from jinja2schema.util import debug_repr
+
+
+config = Config()
 
 
 def get_context(ast):
@@ -20,7 +25,7 @@ def test_cond_expr():
     )
     for template in templates:
         ast = parse(template).find(nodes.CondExpr)
-        rtype, struct = visit_cond_expr(ast, get_context(ast))
+        rtype, struct = visit_cond_expr(ast, get_context(ast), config)
 
         expected_struct = Dictionary({
             'queue': Scalar(label='queue', linenos=[1], may_be_defined=True)
@@ -31,7 +36,7 @@ def test_cond_expr():
 def test_getattr_1():
     template = '{{ (x or y).field.subfield[2].a }}'
     ast = parse(template).find(nodes.Getattr)
-    rtype, struct = visit_getattr(ast, get_context(ast))
+    rtype, struct = visit_getattr(ast, get_context(ast), config)
 
     x_or_y_dict = {
         'field': Dictionary({
@@ -51,7 +56,7 @@ def test_getattr_1():
 def test_getattr_2():
     template = '{{ data.field.subfield }}'
     ast = parse(template).find(nodes.Getattr)
-    rtype, struct = visit_getattr(ast, get_context(ast))
+    rtype, struct = visit_getattr(ast, get_context(ast), config)
 
     expected_struct = Dictionary({
         'data': Dictionary({
@@ -66,7 +71,9 @@ def test_getattr_2():
 def test_getattr_3():
     template = '''{{ a[z][1:\nn][1].x }}'''
     ast = parse(template).find(nodes.Getattr)
-    rtype, struct = visit_getattr(ast, get_context(ast))
+    config = Config()
+    config.VARIABLE_INDEXED_WITH_VARIABLE_TYPE = 'list'
+    rtype, struct = visit_getattr(ast, get_context(ast), config)
 
     expected_struct = Dictionary({
         'a': List(
@@ -82,7 +89,7 @@ def test_getattr_3():
             linenos=[1]
         ),
         'z': Scalar(label='z', linenos=[1]),
-        'n': Scalar(label='n', linenos=[2])
+        'n': Scalar(label='n', possible_types={'number'}, linenos=[2])
     })
     assert struct == expected_struct
 
@@ -90,7 +97,9 @@ def test_getattr_3():
 def test_getitem_1():
     template = '''{{ a['b']['c'][1]['d'][x] }}'''
     ast = parse(template).find(nodes.Getitem)
-    rtype, struct = visit_getitem(ast, get_context(ast))
+    config = Config()
+    config.VARIABLE_INDEXED_WITH_VARIABLE_TYPE = 'list'
+    rtype, struct = visit_getitem(ast, get_context(ast), config)
 
     expected_struct = Dictionary({
         'a': Dictionary({
@@ -105,10 +114,24 @@ def test_getitem_1():
     assert struct == expected_struct
 
 
+def test_getitem_2():
+    template = '''{{ a[z] }}'''
+    ast = parse(template).find(nodes.Getitem)
+    config = Config()
+    config.VARIABLE_INDEXED_WITH_VARIABLE_TYPE = 'dictionary'
+    rtype, struct = visit_getitem(ast, get_context(ast), config)
+
+    expected_struct = Dictionary({
+        'a': Dictionary(label='a', linenos=[1]),
+        'z': Scalar(label='z', linenos=[1]),
+    })
+    assert struct == expected_struct
+
+
 def test_compare_1():
     template = '{{ a < b < c }}'
     ast = parse(template).find(nodes.Compare)
-    rtype, struct = visit_compare(ast, get_context(ast))
+    rtype, struct = visit_compare(ast, get_context(ast), config)
 
     expected_struct = Dictionary({
         'a': Scalar(label='a', linenos=[1]),
@@ -121,7 +144,7 @@ def test_compare_1():
 def test_compare_2():
     template = '{{ a + b[1] - c == 4 == x }}'
     ast = parse(template).find(nodes.Compare)
-    rtype, struct = visit_compare(ast, get_context(ast))
+    rtype, struct = visit_compare(ast, get_context(ast), config)
 
     expected_struct = Dictionary({
         'a': Scalar(label='a', linenos=[1]),
@@ -135,10 +158,10 @@ def test_compare_2():
 def test_filter_1():
     template = '{{ x|striptags }}'
     ast = parse(template).find(nodes.Filter)
-    rtype, struct = visit_filter(ast, get_context(ast))
+    rtype, struct = visit_filter(ast, get_context(ast), config)
 
     expected_struct = Dictionary({
-        'x': Scalar(label='x', linenos=[1]),
+        'x': Scalar(label='x', possible_types={'string'}, linenos=[1]),
     })
     assert struct == expected_struct
 
@@ -147,16 +170,16 @@ def test_filter_2():
     template = '''{{ items|batch(3, '&nbsp;') }}'''
     ast = parse(template).find(nodes.Filter)
     with pytest.raises(UnexpectedExpression):
-        visit_filter(ast, get_context(ast))
+        visit_filter(ast, get_context(ast), config)
 
 
 def test_filter_3():
     template = '''{{ x|default('g') }}'''
     ast = parse(template).find(nodes.Filter)
-    rtype, struct = visit_filter(ast, get_context(ast))
+    rtype, struct = visit_filter(ast, get_context(ast), config)
 
     expected_struct = Dictionary({
-        'x': Scalar(label='x', linenos=[1], used_with_default=True),
+        'x': Scalar(label='x', linenos=[1], possible_types={'string'}, used_with_default=True),
     })
     assert struct == expected_struct
 
@@ -164,7 +187,7 @@ def test_filter_3():
 def test_filter_4():
     template = '''{{ (xs|first|last).gsom|sort|length }}'''
     ast = parse(template).find(nodes.Filter)
-    rtype, struct = visit_filter(ast, get_context(ast))
+    rtype, struct = visit_filter(ast, get_context(ast), config)
 
     expected_struct = Dictionary({
         'xs': List(List(Dictionary({
@@ -177,7 +200,7 @@ def test_filter_4():
 def test_filter_5():
     template = '''{{ x|list|sort|first }}'''
     ast = parse(template).find(nodes.Filter)
-    rtype, struct = visit_filter(ast, get_context(ast))
+    rtype, struct = visit_filter(ast, get_context(ast), config)
 
     expected_struct = Dictionary({
         'x': Scalar(label='x', linenos=[1]),
@@ -189,32 +212,67 @@ def test_filter_6():
     template = '''{{ x|unknownfilter }}'''
     ast = parse(template).find(nodes.Filter)
     with pytest.raises(InvalidExpression):
-        visit_filter(ast, get_context(ast))
+        visit_filter(ast, get_context(ast), config)
 
 
 def test_filter_7():
     template = '''{{ x|first|list }}'''
     ast = parse(template).find(nodes.Filter)
     with pytest.raises(UnexpectedExpression):
-        visit_filter(ast, get_context(ast))
+        visit_filter(ast, get_context(ast), config)
+
+
+def test_filter_8():
+    ast = parse('{{ x|abs }}').find(nodes.Filter)
+    rtype, struct = visit_filter(ast, get_context(ast), config)
+    assert rtype == Scalar(label='x', linenos=[1], possible_types={'number'})
+    assert struct == Dictionary({
+        'x': Scalar(label='x', linenos=[1], possible_types={'number'})
+    })
+
+    ast = parse('{{ x|striptags }}').find(nodes.Filter)
+    rtype, struct = visit_filter(ast, get_context(ast), config)
+    assert rtype == Scalar(label='x', linenos=[1], possible_types={'string'})
+    assert struct == Dictionary({
+        'x': Scalar(label='x', linenos=[1], possible_types={'string'})
+    })
+
+    ast = parse('{{ x|wordcount }}').find(nodes.Filter)
+    rtype, struct = visit_filter(ast, get_context(ast), config)
+    assert rtype == Scalar(label='x', linenos=[1], possible_types={'number'})
+    assert struct == Dictionary({
+        'x': Scalar(label='x', linenos=[1], possible_types={'string'})
+    })
+
+
+def test_slice():
+    template = '''{{ xs[a:2:b] }}'''
+    ast = parse(template).find(nodes.Getitem)
+    rtype, struct = visit_getitem(ast, get_context(ast), config)
+    assert struct == Dictionary({
+        'xs': List(Scalar(linenos=[1]), label='xs', linenos=[1]),
+        'a': Scalar(label='a', possible_types={'number'}, linenos=[1]),
+        'b': Scalar(label='b', possible_types={'number'}, linenos=[1]),
+    })
 
 
 def test_test_1():
     template = '''{{ x is divisibleby data.field }}'''
     ast = parse(template).find(nodes.Test)
-    rtype, struct = visit_test(ast, get_context(ast))
+    rtype, struct = visit_test(ast, get_context(ast), config)
 
     expected_struct = Dictionary({
         'x': Scalar(label='x', linenos=[1]),
         'data': Dictionary({
-            'field': Scalar(label='field', linenos=[1]),
+            'field': Scalar(label='field', possible_types={'number'}, linenos=[1]),
         }, label='data', linenos=[1])
     })
+
     assert struct == expected_struct
 
     template = '''{{ x is divisibleby 3 }}'''
     ast = parse(template).find(nodes.Test)
-    rtype, struct = visit_test(ast, get_context(ast))
+    rtype, struct = visit_test(ast, get_context(ast), config)
 
     expected_struct = Dictionary({
         'x': Scalar(label='x', linenos=[1]),
@@ -225,7 +283,7 @@ def test_test_1():
 def test_test_2():
     template = '''{{ x is string }}'''
     ast = parse(template).find(nodes.Test)
-    rtype, struct = visit_test(ast, get_context(ast))
+    rtype, struct = visit_test(ast, get_context(ast), config)
 
     expected_struct = Dictionary({
         'x': Unknown(label='x', linenos=[1])
@@ -237,11 +295,11 @@ def test_call_dict():
     template = '''{{ dict(x=\ndict(\na=1, b=2)) }}'''
     call_ast = parse(template).find(nodes.Call)
     rtype, struct = visit_call(
-        call_ast, Context(predicted_struct=Unknown.from_ast(call_ast)))
+        call_ast, Context(predicted_struct=Unknown.from_ast(call_ast)), config)
     expected_rtype = Dictionary({
         'x': Dictionary({
-            'a': Scalar(linenos=[3], constant=True),
-            'b': Scalar(linenos=[3], constant=True)
+            'a': Scalar(linenos=[3], possible_types={'number'}, constant=True),
+            'b': Scalar(linenos=[3], possible_types={'number'}, constant=True)
         }, linenos=[2], constant=True)
     }, linenos=[1], constant=True)
     assert rtype == expected_rtype
