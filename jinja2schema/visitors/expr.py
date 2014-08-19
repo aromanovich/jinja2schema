@@ -435,16 +435,15 @@ def visit_template_data(ast, ctx, config):
 @visits_expr(nodes.Const)
 def visit_const(ast, ctx, config):
     ctx.meet(Scalar(), ast)
-    possible_types = None
     if isinstance(ast.value, _compat.string_types):
-        return String.from_ast(ast, constant=True), Dictionary()
+        rtype = String.from_ast(ast, constant=True)
     elif isinstance(ast.value, (int, float, complex)):
-        return Number.from_ast(ast, constant=True), Dictionary()
+        rtype = Number.from_ast(ast, constant=True)
     elif isinstance(ast.value, bool):
-        return Boolean.from_ast(ast, constant=True), Dictionary()
-    elif ast.value is None:
-        possible_types = {'null'}
-    return Scalar.from_ast(ast, possible_types=possible_types, constant=True), Dictionary()
+        rtype = Boolean.from_ast(ast, constant=True)
+    else:
+        rtype = Scalar.from_ast(ast, constant=True)
+    return rtype, Dictionary()
 
 
 @visits_expr(nodes.Tuple)
