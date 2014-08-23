@@ -46,7 +46,7 @@ def infer_from_ast(ast, ignore_constants=True, config=Config()):
     :raises: :class:`.exceptions.MergeException`, :class:`.exceptions.InvalidExpression`,
              :class:`.exceptions.UnexpectedExpression`
     """
-    rv = visit(ast, config)
+    rv = visit(ast, {}, config)
     if ignore_constants:
         rv = _ignore_constants(rv)
     return rv

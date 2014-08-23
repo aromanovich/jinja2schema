@@ -7,10 +7,11 @@ Statement is an instance of :class:`jinja2.nodes.Stmt`.
 Statement visitors return :class:`.models.Dictionary` of structures of variables used within the statement.
 """
 import functools
+import itertools
 
 from jinja2 import nodes
 
-from ..model import Scalar, Dictionary, List, Unknown, Tuple, Boolean
+from ..model import Scalar, Dictionary, List, Unknown, Tuple, Boolean, Macro
 from ..mergers import merge
 from ..exceptions import InvalidExpression
 from .. import _compat
@@ -29,14 +30,14 @@ def visits_stmt(node_cls):
     def decorator(func):
         stmt_visitors[node_cls] = func
         @functools.wraps(func)
-        def wrapped_func(ast, config):
+        def wrapped_func(ast, macroses, config):
             assert isinstance(ast, node_cls)
-            return func(ast, config)
+            return func(ast, macroses, config)
         return wrapped_func
     return decorator
 
 
-def visit_stmt(ast, config):
+def visit_stmt(ast, macroses, config):
     """Returns a structure of ``ast``.
 
     :param ast: instance of :class:`jinja2.nodes.Stmt`
@@ -49,13 +50,13 @@ def visit_stmt(ast, config):
                 visitor = visitor_
     if not visitor:
         raise Exception('stmt visitor for {} is not found'.format(type(ast)))
-    return visitor(ast, config)
+    return visitor(ast, macroses, config)
 
 
 @visits_stmt(nodes.For)
-def visit_for(ast, config):
-    body_struct = visit_many(ast.body, config, predicted_struct_cls=Scalar)
-    else_struct = visit_many(ast.else_, config, predicted_struct_cls=Scalar)
+def visit_for(ast, macroses, config):
+    body_struct = visit_many(ast.body, macroses, config, predicted_struct_cls=Scalar)
+    else_struct = visit_many(ast.else_, macroses, config, predicted_struct_cls=Scalar)
 
     if 'loop' in body_struct:
         # exclude a special `loop` variable from the body structure
@@ -74,7 +75,7 @@ def visit_for(ast, config):
         Context(
             return_struct_cls=Unknown,
             predicted_struct=List.from_ast(ast, target_struct)),
-        config)
+        macroses, config)
 
     merge(iter_rtype, List(target_struct))
 
@@ -82,15 +83,15 @@ def visit_for(ast, config):
 
 
 @visits_stmt(nodes.If)
-def visit_if(ast, config):
+def visit_if(ast, macroses, config):
     if config.ALLOW_ONLY_BOOLEAN_VARIABLES_IN_TEST:
         test_predicted_struct = Boolean.from_ast(ast.test)
     else:
         test_predicted_struct = Unknown.from_ast(ast.test)
     test_rtype, test_struct = visit_expr(
-        ast.test, Context(return_struct_cls=Unknown, predicted_struct=test_predicted_struct), config)
-    if_struct = visit_many(ast.body, config, predicted_struct_cls=Scalar)
-    else_struct = visit_many(ast.else_, config, predicted_struct_cls=Scalar) if ast.else_ else Dictionary()
+        ast.test, Context(return_struct_cls=Unknown, predicted_struct=test_predicted_struct), macroses, config)
+    if_struct = visit_many(ast.body, macroses, config, predicted_struct_cls=Scalar)
+    else_struct = visit_many(ast.else_, macroses, config, predicted_struct_cls=Scalar) if ast.else_ else Dictionary()
     struct = merge(merge(test_struct, if_struct), else_struct)
 
     if isinstance(ast.test, nodes.Test) and isinstance(ast.test.node, nodes.Name):
@@ -106,7 +107,7 @@ def visit_if(ast, config):
 
 
 @visits_stmt(nodes.Assign)
-def visit_assign(ast, config):
+def visit_assign(ast, macroses, config):
     struct = Dictionary()
     if (isinstance(ast.target, nodes.Name) or
             (isinstance(ast.target, nodes.Tuple) and isinstance(ast.node, nodes.Tuple))):
@@ -120,7 +121,7 @@ def visit_assign(ast, config):
             for name_ast, var_ast in _compat.izip(ast.target.items, ast.node.items):
                 variables.append((name_ast.name, var_ast))
         for var_name, var_ast in variables:
-            var_rtype, var_struct = visit_expr(var_ast, Context(predicted_struct=Unknown.from_ast(var_ast)), config)
+            var_rtype, var_struct = visit_expr(var_ast, Context(predicted_struct=Unknown.from_ast(var_ast)), macroses, config)
             var_rtype.constant = True
             var_rtype.label = var_name
             struct = merge(merge(struct, var_struct), Dictionary({
@@ -134,12 +135,44 @@ def visit_assign(ast, config):
             tuple_items.append(var_struct)
             struct = merge(struct, Dictionary({name_ast.name: var_struct}))
         var_rtype, var_struct = visit_expr(
-            ast.node, Context(return_struct_cls=Unknown, predicted_struct=Tuple(tuple_items)), config)
+            ast.node, Context(return_struct_cls=Unknown, predicted_struct=Tuple(tuple_items)), macroses, config)
         return merge(struct, var_struct)
     else:
         raise InvalidExpression(ast, 'unsupported assignment')
 
 
 @visits_stmt(nodes.Output)
-def visit_output(ast, config):
-    return visit_many(ast.nodes, config, predicted_struct_cls=Scalar)
+def visit_output(ast, macroses, config):
+    return visit_many(ast.nodes, macroses, config, predicted_struct_cls=Scalar)
+
+
+@visits_stmt(nodes.Macro)
+def visit_macro(ast, macroses, config):
+    args = []
+    kwargs = []
+    for i, (arg, default_value_ast) in enumerate(reversed(list(itertools.izip_longest(reversed(ast.args), reversed(ast.defaults)))), start=1):
+        has_default_value = bool(default_value_ast)
+        if has_default_value:
+            default_rtype, default_struct = visit_expr(default_value_ast,
+                                                       Context(return_struct_cls=Unknown, predicted_struct=Unknown()), macroses, config)
+        else:
+            default_rtype = Unknown(linenos=[arg.lineno])
+        default_rtype.constant = False
+        default_rtype.label = 'argument #{}'.format(i)
+        if has_default_value:
+            kwargs.append((arg.name, default_rtype))
+        else:
+            args.append((arg.name, default_rtype))
+    macroses[ast.name] = Macro(ast.name, args, kwargs)
+    body_struct = visit_many(ast.body, macroses, config, predicted_struct_cls=Scalar)
+
+    tmp = dict(args)
+    tmp.update(dict(kwargs))
+    args_struct = Dictionary(tmp)
+    for arg_name, arg_type in args:
+        args_struct[arg_name] = arg_type
+    merge(args_struct, body_struct)  # just to make sure
+
+    for arg in args_struct.iterkeys():
+        body_struct.pop(arg, None)
+    return body_struct

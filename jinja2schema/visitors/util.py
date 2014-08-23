@@ -9,18 +9,18 @@ from ..mergers import merge
 from ..model import Dictionary, Scalar, Unknown
 
 
-def visit(node, config, predicted_struct_cls=Scalar, return_struct_cls=Unknown):
+def visit(node, macroses, config, predicted_struct_cls=Scalar, return_struct_cls=Unknown):
     if isinstance(node, jinja2.nodes.Stmt):
-        structure = visit_stmt(node, config)
+        structure = visit_stmt(node, macroses, config)
     elif isinstance(node, jinja2.nodes.Expr):
         ctx = Context(predicted_struct=predicted_struct_cls.from_ast(node), return_struct_cls=return_struct_cls)
-        _, structure = visit_expr(node, ctx, config)
+        _, structure = visit_expr(node, ctx, macroses, config)
     elif isinstance(node, jinja2.nodes.Template):
-        structure = visit_many(node.body, config)
+        structure = visit_many(node.body, macroses, config)
     return structure
 
 
-def visit_many(nodes, config, predicted_struct_cls=Scalar, return_struct_cls=Unknown):
+def visit_many(nodes, macroses, config, predicted_struct_cls=Scalar, return_struct_cls=Unknown):
     """Visits ``nodes`` and merges results.
 
     :param nodes: list of :class:`jinja2.nodes.Node`
@@ -30,7 +30,7 @@ def visit_many(nodes, config, predicted_struct_cls=Scalar, return_struct_cls=Unk
     """
     rv = Dictionary()
     for node in nodes:
-        structure = visit(node, config, predicted_struct_cls=predicted_struct_cls, return_struct_cls=return_struct_cls)
+        structure = visit(node, macroses, config, predicted_struct_cls=predicted_struct_cls, return_struct_cls=return_struct_cls)
         rv = merge(rv, structure)
     return rv
 

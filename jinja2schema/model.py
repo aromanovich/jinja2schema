@@ -319,3 +319,10 @@ class Unknown(Variable):
             {'type': 'null'},
         ]
         return rv
+
+
+class Macro(object):
+    def __init__(self, name, args, kwargs):
+        self.name = name
+        self.args = args
+        self.kwargs = kwargs

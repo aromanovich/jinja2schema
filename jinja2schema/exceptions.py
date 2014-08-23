@@ -28,10 +28,7 @@ class MergeException(InferException):
     def __str__(self):
         get_label = lambda s: 'unnamed variable' if s.label is None else 'variable "{}"'.format(s.label)
         def get_usage(s):
-            rv = s.__class__.__name__.lower()
-            if isinstance(s, Scalar):
-                rv += ' ({})'.format(', '.join(s.possible_types))
-            return rv
+            return s.__class__.__name__.lower()
         get_linenos = lambda s: ', '.join(map(str, s.linenos))
         return ('{fst_label} (used as {fst_usage} on lines {fst_linenos}) conflicts with '
                 '{snd_label} (used as {snd_usage} on lines: {snd_linenos})').format(
