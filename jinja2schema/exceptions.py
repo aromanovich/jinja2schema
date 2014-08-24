@@ -26,7 +26,7 @@ class MergeException(InferException):
         self.snd = snd
 
     def __str__(self):
-        get_label = lambda s: 'unnamed variable' if s.label is None else 'variable "{}"'.format(s.label)
+        get_label = lambda s: 'unnamed variable' if s.label is None else 'variable "{0}"'.format(s.label)
         def get_usage(s):
             return s.__class__.__name__.lower()
         get_linenos = lambda s: ', '.join(map(str, s.linenos))
