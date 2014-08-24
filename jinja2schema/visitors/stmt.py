@@ -7,7 +7,6 @@ Statement is an instance of :class:`jinja2.nodes.Stmt`.
 Statement visitors return :class:`.models.Dictionary` of structures of variables used within the statement.
 """
 import functools
-import itertools
 
 from jinja2 import nodes
 
@@ -17,6 +16,12 @@ from ..exceptions import InvalidExpression
 from .. import _compat
 from .expr import Context, visit_expr
 from .util import visit_many
+
+if _compat.PY2:
+    from itertools import izip_longest as zip_longest
+else:
+    from itertools import zip_longest
+
 
 
 stmt_visitors = {}
@@ -49,7 +54,7 @@ def visit_stmt(ast, macroses, config):
             if isinstance(ast, node_cls):
                 visitor = visitor_
     if not visitor:
-        raise Exception('stmt visitor for {} is not found'.format(type(ast)))
+        raise Exception('stmt visitor for {0} is not found'.format(type(ast)))
     return visitor(ast, macroses, config)
 
 
@@ -148,30 +153,35 @@ def visit_output(ast, macroses, config):
 
 @visits_stmt(nodes.Macro)
 def visit_macro(ast, macroses, config):
+    # XXX the code needs to be refactored
     args = []
     kwargs = []
-    for i, (arg, default_value_ast) in enumerate(reversed(list(itertools.izip_longest(reversed(ast.args), reversed(ast.defaults)))), start=1):
+    body_struct = visit_many(ast.body, macroses, config, predicted_struct_cls=Scalar)
+
+    for i, (arg, default_value_ast) in enumerate(reversed(list(zip_longest(reversed(ast.args),
+                                                                           reversed(ast.defaults)))), start=1):
         has_default_value = bool(default_value_ast)
         if has_default_value:
-            default_rtype, default_struct = visit_expr(default_value_ast,
-                                                       Context(return_struct_cls=Unknown, predicted_struct=Unknown()), macroses, config)
+            default_rtype, default_struct = visit_expr(
+                default_value_ast, Context(predicted_struct=Unknown()), macroses, config)
         else:
             default_rtype = Unknown(linenos=[arg.lineno])
         default_rtype.constant = False
-        default_rtype.label = 'argument #{}'.format(i)
+        default_rtype.label = 'argument "{0}"'.format(arg.name) if has_default_value else 'argument #{0}'.format(i)
+        if arg.name in body_struct:
+            default_rtype = merge(default_rtype, body_struct[arg.name])  # just to make sure
+        default_rtype.linenos = [ast.lineno]
         if has_default_value:
             kwargs.append((arg.name, default_rtype))
         else:
             args.append((arg.name, default_rtype))
     macroses[ast.name] = Macro(ast.name, args, kwargs)
-    body_struct = visit_many(ast.body, macroses, config, predicted_struct_cls=Scalar)
 
     tmp = dict(args)
     tmp.update(dict(kwargs))
     args_struct = Dictionary(tmp)
     for arg_name, arg_type in args:
         args_struct[arg_name] = arg_type
-    merge(args_struct, body_struct)  # just to make sure
 
     for arg in args_struct.iterkeys():
         body_struct.pop(arg, None)

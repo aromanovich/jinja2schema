@@ -84,4 +84,4 @@ class InvalidExpression(InferException):
         self.message = message
 
     def __str__(self):
-        return 'line {}: {}'.format(self.ast.lineno, self.message)
+        return 'line {0}: {1}'.format(self.ast.lineno, self.message)

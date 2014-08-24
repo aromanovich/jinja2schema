@@ -22,6 +22,7 @@ def merge(fst, snd):
         ``fst`` must reflect expressions that occur in template **before** the expressions of ``snd``.
     """
     assert (not (fst.linenos and snd.linenos) or
+            (fst.linenos == snd.linenos) or  # TODO this is a hack
             max(fst.linenos) <= min(snd.linenos))
 
     if isinstance(fst, Unknown):
