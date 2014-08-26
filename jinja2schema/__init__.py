@@ -17,9 +17,9 @@ __title__ = 'jinja2schema'
 __author__ = 'Anton Romanovich'
 __license__ = 'BSD'
 __copyright__ = 'Copyright 2014 Anton Romanovich'
-__version__ = '0.0.2'
+__version__ = '0.0.3'
 __version_info__ = tuple(int(i) for i in __version__.split('.'))
 
-
+from .config import Config
 from .core import parse, infer, infer_from_ast
 from .exceptions import InferException, MergeException, InvalidExpression, UnexpectedExpression
