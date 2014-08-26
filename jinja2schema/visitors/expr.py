@@ -11,7 +11,7 @@ import functools
 from jinja2 import nodes
 
 from ..model import Scalar, Dictionary, List, Unknown, Tuple, String, Number, Boolean
-from ..mergers import merge_rtypes, merge
+from ..mergers import merge_rtypes, merge, merge_many
 from ..exceptions import InvalidExpression, UnexpectedExpression, MergeException
 from .. import _compat
 from .util import visit_many
@@ -192,9 +192,12 @@ def visit_unary_expr(ast, ctx, macroses, config):
 
 @visits_expr(nodes.Compare)
 def visit_compare(ast, ctx, macroses, config):
-    rtype, struct = visit_expr(ast.expr, ctx, macroses, config)
+    ctx.meet(Boolean(), ast)
+    rtype, struct = visit_expr(ast.expr, Context(predicted_struct=Unknown.from_ast(ast.expr)),
+                               macroses, config)
     for op in ast.ops:
-        op_rtype, op_struct = visit_expr(op.expr, ctx, macroses, config)
+        op_rtype, op_struct = visit_expr(op.expr, Context(predicted_struct=Unknown.from_ast(ast.expr)),
+                                         macroses, config)
         struct = merge(struct, op_struct)
     return Boolean.from_ast(ast), struct
 
@@ -261,8 +264,9 @@ def visit_getitem(ast, ctx, macroses, config):
 
 @visits_expr(nodes.Test)
 def visit_test(ast, ctx, macroses, config):
+    ctx.meet(Boolean(), ast)
     if ast.name in ('divisibleby', 'escaped', 'even', 'lower', 'odd', 'upper'):
-        ctx.meet(Scalar(), ast)
+        # TODO
         predicted_struct = Scalar.from_ast(ast.node)
     elif ast.name in ('defined', 'undefined', 'equalto', 'iterable', 'mapping',
                       'none', 'number', 'sameas', 'sequence', 'string'):
@@ -288,14 +292,14 @@ def visit_concat(ast, ctx, macroses, config):
 
 @visits_expr(nodes.CondExpr)
 def visit_cond_expr(ast, ctx, macroses, config):
-    if config.ALLOW_ONLY_BOOLEAN_VARIABLES_IN_TEST:
+    if config.CONSIDER_CONDITIONS_AS_BOOLEAN:
         test_predicted_struct = Boolean.from_ast(ast.test)
     else:
         test_predicted_struct = Unknown.from_ast(ast.test)
     test_rtype, test_struct = visit_expr(ast.test, Context(predicted_struct=test_predicted_struct), macroses, config)
     if_rtype, if_struct = visit_expr(ast.expr1, ctx, macroses, config)
     else_rtype, else_struct = visit_expr(ast.expr2, ctx, macroses, config)
-    struct = merge(merge(if_struct, test_struct), else_struct)
+    struct = merge_many(if_struct, test_struct, else_struct)
     rtype = merge_rtypes(if_rtype, else_rtype)
 
     if (isinstance(ast.test, nodes.Test) and isinstance(ast.test.node, nodes.Name) and

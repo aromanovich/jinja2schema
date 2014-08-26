@@ -89,12 +89,12 @@ def visit_for(ast, macroses, config):
 
 @visits_stmt(nodes.If)
 def visit_if(ast, macroses, config):
-    if config.ALLOW_ONLY_BOOLEAN_VARIABLES_IN_TEST:
+    if config.CONSIDER_CONDITIONS_AS_BOOLEAN:
         test_predicted_struct = Boolean.from_ast(ast.test)
     else:
         test_predicted_struct = Unknown.from_ast(ast.test)
     test_rtype, test_struct = visit_expr(
-        ast.test, Context(return_struct_cls=Unknown, predicted_struct=test_predicted_struct), macroses, config)
+        ast.test, Context(predicted_struct=test_predicted_struct), macroses, config)
     if_struct = visit_many(ast.body, macroses, config, predicted_struct_cls=Scalar)
     else_struct = visit_many(ast.else_, macroses, config, predicted_struct_cls=Scalar) if ast.else_ else Dictionary()
     struct = merge(merge(test_struct, if_struct), else_struct)

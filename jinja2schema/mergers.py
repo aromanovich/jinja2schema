@@ -66,6 +66,14 @@ def merge(fst, snd):
     return result
 
 
+def merge_many(fst, snd, *args):
+    struct = merge(fst, snd)
+    if args:
+        return merge_many(struct, *args)
+    else:
+        return struct
+
+
 def merge_rtypes(fst, snd, operator=None):
     if operator in ('+', '-'):
         if type(fst) is not type(snd) and not (isinstance(fst, Unknown) or isinstance(snd, Unknown)):

@@ -134,9 +134,9 @@ def test_compare_1():
     rtype, struct = visit_compare(ast, get_context(ast), {}, test_config)
 
     expected_struct = Dictionary({
-        'a': Scalar(label='a', linenos=[1]),
-        'b': Scalar(label='b', linenos=[1]),
-        'c': Scalar(label='c', linenos=[1]),
+        'a': Unknown(label='a', linenos=[1]),
+        'b': Unknown(label='b', linenos=[1]),
+        'c': Unknown(label='c', linenos=[1]),
     })
     assert struct == expected_struct
 
@@ -145,12 +145,12 @@ def test_compare_2():
     template = '{{ a + b[1] - c == 4 == x }}'
     ast = parse(template).find(nodes.Compare)
     rtype, struct = visit_compare(ast, get_context(ast), {}, test_config)
-
+    # TODO make customizable
     expected_struct = Dictionary({
-        'a': Scalar(label='a', linenos=[1]),
-        'b': List(Scalar(linenos=[1]), label='b', linenos=[1]),
-        'c': Scalar(label='c', linenos=[1]),
-        'x': Scalar(label='x', linenos=[1]),
+        'a': Unknown(label='a', linenos=[1]),
+        'b': List(Unknown(linenos=[1]), label='b', linenos=[1]),
+        'c': Unknown(label='c', linenos=[1]),
+        'x': Unknown(label='x', linenos=[1]),
     })
     assert struct == expected_struct
 

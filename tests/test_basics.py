@@ -381,7 +381,7 @@ def test_just_test():
     assert struct == expected_struct
 
 
-def test_allow_only_boolean_in_test_setting():
+def test_allow_only_boolean_in_test_setting_1():
     template = '''
     {% if x %}
         Hello!
@@ -396,11 +396,36 @@ def test_allow_only_boolean_in_test_setting():
     })
     assert struct == expected_struct
 
+    infer('{% if [] %}{% endif %}', config_1)  # make sure it doesn't raise
+
     config_2 = Config()
-    config_2.ALLOW_ONLY_BOOLEAN_VARIABLES_IN_TEST = True
+    config_2.CONSIDER_CONDITIONS_AS_BOOLEAN = True
     struct = infer(template, config_2)
     expected_struct = Dictionary({
         'x': Boolean(label='x', linenos=[2]),
         'y': Boolean(label='y', linenos=[5]),
     })
     assert struct == expected_struct
+
+    with pytest.raises(UnexpectedExpression) as e:
+        infer('{% if [] %}{% endif %}', config_2)  # make sure this does raise
+    assert str(e.value) == ('conflict on the line 1\n'
+                            'got: AST node jinja2.nodes.List of structure [<unknown>]\n'
+                            'expected structure: <boolean>')
+
+
+def test_allow_only_boolean_in_test_setting_2():
+    config = Config()
+    config.CONSIDER_CONDITIONS_AS_BOOLEAN = True
+
+    template = '''
+    {% if x == 'test' %}
+        Hello!
+    {% endif %}
+    '''
+    struct = infer(template, config)
+    expected_struct = Dictionary({
+        'x': Unknown(label='x', linenos=[2]),
+    })
+    assert struct == expected_struct
+

@@ -22,7 +22,7 @@ class Config(object):
     being indexed with an integer.
     """
 
-    ALLOW_ONLY_BOOLEAN_VARIABLES_IN_TEST = False
+    CONSIDER_CONDITIONS_AS_BOOLEAN = False
     """Whether or not to consider conditions in ``if`` statements as boolean.
 
     If this variable is not set, ``xs`` variable in template ``{% if xs %}{% endif %}`` will have
