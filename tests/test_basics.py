@@ -5,7 +5,7 @@ from jinja2schema.config import Config
 
 from jinja2schema.core import infer
 from jinja2schema.exceptions import MergeException, UnexpectedExpression
-from jinja2schema.model import List, Dictionary, Scalar, Unknown, String, Boolean
+from jinja2schema.model import List, Dictionary, Scalar, Unknown, String, Boolean, Tuple
 
 
 def test_may_be_defined():
@@ -426,6 +426,28 @@ def test_allow_only_boolean_in_test_setting_2():
     struct = infer(template, config)
     expected_struct = Dictionary({
         'x': Unknown(label='x', linenos=[2]),
+    })
+    assert struct == expected_struct
+
+
+def test_basics_100():
+    config = Config()
+    config.TYPE_OF_VARIABLE_INDEXED_WITH_INTEGER_TYPE = 'tuple'
+
+    template = '''
+    {% for x in xs %}
+        {{ x[2] }}
+        {{ x[3] }}
+    {% endfor %}
+    '''
+    struct = infer(template, config)
+    expected_struct = Dictionary({
+        'xs': List(Tuple((
+             Unknown(label=None, linenos=[]),
+             Unknown(label=None, linenos=[]),
+             Scalar(label=None, linenos=[3]),
+             Scalar(label=None, linenos=[4]),
+        ), label='x', linenos=[3, 4]), label='xs', linenos=[2])
     })
     assert struct == expected_struct
 

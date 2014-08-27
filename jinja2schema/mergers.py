@@ -7,6 +7,7 @@ import itertools
 
 from .model import Scalar, Dictionary, List, Unknown, Tuple
 from .exceptions import MergeException
+from ._compat import zip_longest
 
 
 def merge(fst, snd):
@@ -53,9 +54,9 @@ def merge(fst, snd):
         if fst.items is snd.items is None:
             result = Tuple(None)
         else:
-            if len(fst.items) != len(snd.items):
+            if len(fst.items) != len(snd.items) and not (fst.may_be_extended or snd.may_be_extended):
                 raise MergeException(fst, snd)
-            result = Tuple([merge(a, b) for a, b in zip(fst.items, snd.items)])
+            result = Tuple([merge(a, b) for a, b in zip_longest(fst.items, snd.items, fillvalue=Unknown())])
     else:
         raise MergeException(fst, snd)
     result.label = fst.label or snd.label

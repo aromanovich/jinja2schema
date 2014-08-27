@@ -240,6 +240,10 @@ def visit_getitem(ast, ctx, macroses, config):
                 predicted_struct = Dictionary.from_ast(ast, {
                     arg.value: ctx.get_predicted_struct(),
                 })
+            elif config.TYPE_OF_VARIABLE_INDEXED_WITH_INTEGER_TYPE == 'tuple':
+                items = [Unknown() for i in xrange(arg.value + 1)]
+                items[arg.value] = ctx.get_predicted_struct()
+                predicted_struct = Tuple.from_ast(ast, tuple(items), may_be_extended=True)
         elif isinstance(arg.value, _compat.string_types):
             predicted_struct = Dictionary.from_ast(ast, {
                 arg.value: ctx.get_predicted_struct(label=arg.value),

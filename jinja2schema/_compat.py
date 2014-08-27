@@ -40,6 +40,7 @@ if not PY2:
     encode_filename = _identity
     get_next = lambda x: x.__next__
 
+    from itertools import zip_longest
 else:
     unichr = unichr
     text_type = unicode
@@ -76,3 +77,4 @@ else:
             return filename.encode('utf-8')
         return filename
 
+    from itertools import izip_longest as zip_longest

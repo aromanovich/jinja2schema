@@ -227,6 +227,7 @@ class Tuple(Variable):
     """
     def __init__(self, items, **kwargs):
         self.items = tuple(items) if items is not None else None
+        self.may_be_extended = kwargs.pop('may_be_extended', False)
         super(Tuple, self).__init__(**kwargs)
 
     def __eq__(self, other):

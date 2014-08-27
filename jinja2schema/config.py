@@ -15,10 +15,10 @@ class Config(object):
     """
 
     TYPE_OF_VARIABLE_INDEXED_WITH_INTEGER_TYPE = 'list'
-    """Possible values: ``"dictionary"`` or ``"list""``.
+    """Possible values: ``"dictionary"``, ``"list"`` or ``"tuple"``.
 
-    For example, in the expression ``xs[2]`` variable ``xs`` may be a list as well as a dictionary.
-    This setting is used to choose between a dictionary and a list when the variable is
+    For example, in the expression ``xs[2]`` variable ``xs`` may be a list as well as a dictionary or a tuple.
+    This setting is used to choose between a dictionary, a tuple and a list when the variable is
     being indexed with an integer.
     """
 

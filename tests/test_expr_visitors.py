@@ -7,7 +7,7 @@ from jinja2schema.core import parse
 from jinja2schema.visitors.expr import (Context, visit_getitem, visit_cond_expr, visit_test,
                                         visit_getattr, visit_compare, visit_filter, visit_call, visit_dict)
 from jinja2schema.exceptions import UnexpectedExpression, InvalidExpression
-from jinja2schema.model import Dictionary, Scalar, List, Unknown, String, Number, Boolean
+from jinja2schema.model import Dictionary, Scalar, List, Unknown, String, Number, Boolean, Tuple
 from jinja2schema.util import debug_repr
 
 
@@ -124,6 +124,24 @@ def test_getitem_2():
     expected_struct = Dictionary({
         'a': Dictionary(label='a', linenos=[1]),
         'z': Scalar(label='z', linenos=[1]),
+    })
+    assert struct == expected_struct
+
+
+def test_getitem_3():
+    template = '''{{ a[3] }}'''
+    ast = parse(template).find(nodes.Getitem)
+    config = Config()
+    config.TYPE_OF_VARIABLE_INDEXED_WITH_INTEGER_TYPE = 'tuple'
+    rtype, struct = visit_getitem(ast, get_context(ast), {}, config)
+
+    expected_struct = Dictionary({
+        'a': Tuple([
+            Unknown(),
+            Unknown(),
+            Unknown(),
+            Scalar(linenos=[1]),
+        ], label='a', linenos=[1]),
     })
     assert struct == expected_struct
 

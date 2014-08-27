@@ -11,17 +11,11 @@ import functools
 from jinja2 import nodes
 
 from ..model import Scalar, Dictionary, List, Unknown, Tuple, Boolean, Macro
-from ..mergers import merge
+from ..mergers import merge, merge_many
 from ..exceptions import InvalidExpression
 from .. import _compat
 from .expr import Context, visit_expr
 from .util import visit_many
-
-if _compat.PY2:
-    from itertools import izip_longest as zip_longest
-else:
-    from itertools import zip_longest
-
 
 
 stmt_visitors = {}
@@ -84,7 +78,7 @@ def visit_for(ast, macroses, config):
 
     merge(iter_rtype, List(target_struct))
 
-    return merge(merge(iter_struct, body_struct), else_struct)
+    return merge_many(iter_struct, body_struct, else_struct)
 
 
 @visits_stmt(nodes.If)
@@ -97,7 +91,7 @@ def visit_if(ast, macroses, config):
         ast.test, Context(predicted_struct=test_predicted_struct), macroses, config)
     if_struct = visit_many(ast.body, macroses, config, predicted_struct_cls=Scalar)
     else_struct = visit_many(ast.else_, macroses, config, predicted_struct_cls=Scalar) if ast.else_ else Dictionary()
-    struct = merge(merge(test_struct, if_struct), else_struct)
+    struct = merge_many(test_struct, if_struct, else_struct)
 
     if isinstance(ast.test, nodes.Test) and isinstance(ast.test.node, nodes.Name):
         lookup_struct = None
@@ -129,7 +123,7 @@ def visit_assign(ast, macroses, config):
             var_rtype, var_struct = visit_expr(var_ast, Context(predicted_struct=Unknown.from_ast(var_ast)), macroses, config)
             var_rtype.constant = True
             var_rtype.label = var_name
-            struct = merge(merge(struct, var_struct), Dictionary({
+            struct = merge_many(struct, var_struct, Dictionary({
                 var_name: var_rtype,
             }))
         return struct
@@ -158,7 +152,7 @@ def visit_macro(ast, macroses, config):
     kwargs = []
     body_struct = visit_many(ast.body, macroses, config, predicted_struct_cls=Scalar)
 
-    for i, (arg, default_value_ast) in enumerate(reversed(list(zip_longest(reversed(ast.args),
+    for i, (arg, default_value_ast) in enumerate(reversed(list(_compat.zip_longest(reversed(ast.args),
                                                                            reversed(ast.defaults)))), start=1):
         has_default_value = bool(default_value_ast)
         if has_default_value:
