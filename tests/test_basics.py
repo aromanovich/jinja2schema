@@ -451,3 +451,22 @@ def test_basics_100():
     })
     assert struct == expected_struct
 
+
+def test_basics_101():
+    template = '''
+    {{ section.FILTERS.test }}
+    {%- for f in section.FILTERS.keys() %}
+        {{ section.GEO }}
+        {{ loop.index }}
+    {%- endfor %}
+    '''
+    struct = infer(template)
+    expected_struct = Dictionary({
+        'section': Dictionary({
+            'FILTERS': Dictionary({
+                'test': Scalar(label='test', linenos=[2])
+            }, label='FILTERS', linenos=[2, 3]),
+            'GEO': Scalar(label='GEO', linenos=[4]),
+        }, label='section', linenos=[2, 3, 4])
+    })
+    assert struct == expected_struct

@@ -418,6 +418,13 @@ def visit_call(ast, ctx, macroses, config):
             return _visit_dict(ast, ctx, macroses, [(kwarg.key, kwarg.value) for kwarg in ast.kwargs], config)
         else:
             raise InvalidExpression(ast, '"{0}" call is not supported yet'.format(ast.node.name))
+    elif isinstance(ast.node, nodes.Getattr):
+        if ast.node.attr in ('keys', 'iterkeys', 'values', 'itervalues'):
+            ctx.meet(List(Unknown()), ast)
+            rtype, struct = visit_expr(
+                ast.node.node, Context(predicted_struct=Dictionary.from_ast(ast.node.node)), macroses, config)
+            return List(Unknown()), struct
+
 
 
 @visits_expr(nodes.Filter)
