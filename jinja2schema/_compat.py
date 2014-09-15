@@ -35,9 +35,6 @@ if not PY2:
     izip = zip
     intern = sys.intern
 
-    implements_iterator = _identity
-    implements_to_string = _identity
-    encode_filename = _identity
     get_next = lambda x: x.__next__
 
     from itertools import zip_longest
@@ -60,21 +57,6 @@ else:
     from itertools import imap, izip, ifilter
     intern = intern
 
-    def implements_iterator(cls):
-        cls.next = cls.__next__
-        del cls.__next__
-        return cls
-
-    def implements_to_string(cls):
-        cls.__unicode__ = cls.__str__
-        cls.__str__ = lambda x: x.__unicode__().encode('utf-8')
-        return cls
-
     get_next = lambda x: x.next
-
-    def encode_filename(filename):
-        if isinstance(filename, unicode):
-            return filename.encode('utf-8')
-        return filename
 
     from itertools import izip_longest as zip_longest

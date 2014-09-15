@@ -93,12 +93,13 @@ class Variable(object):
     def to_json_schema(self):
         """Returns JSON schema of the variable.
 
+        .. deprecated:: 0.0.6
+           Use :func:`jinja2schema.core.to_json_schema` instead.
+
         :rtype: :class:`dict`
         """
-        rv = {}
-        if self.label:
-            rv['title'] = self.label
-        return rv
+        from .core import to_json_schema
+        return to_json_schema(self)
 
 
 class Dictionary(Variable):
@@ -172,15 +173,6 @@ class Dictionary(Variable):
     def pop(self, key, default=None):
         return self.data.pop(key, default)
 
-    def to_json_schema(self):
-        rv = super(Dictionary, self).to_json_schema()
-        rv.update({
-            'type': 'object',
-            'properties': dict((k, v.to_json_schema()) for k, v in self.iteritems()),
-            'required': [k for k, v in self.iteritems() if v.required],
-        })
-        return rv
-
 
 class List(Variable):
     """A list which items are of the same type.
@@ -208,14 +200,6 @@ class List(Variable):
     def from_ast(cls, ast, item, **kwargs):
         kwargs = dict(cls._get_kwargs_from_ast(ast), **kwargs)
         return cls(item, **kwargs)
-
-    def to_json_schema(self):
-        rv = super(List, self).to_json_schema()
-        rv.update({
-            'type': 'array',
-            'items': self.item.to_json_schema(),
-        })
-        return rv
 
 
 class Tuple(Variable):
@@ -246,29 +230,11 @@ class Tuple(Variable):
         kwargs = dict(cls._get_kwargs_from_ast(ast), **kwargs)
         return cls(items, **kwargs)
 
-    def to_json_schema(self):
-        rv = super(Tuple, self).to_json_schema()
-        rv.update({
-            'type': 'array',
-            'items': [item.to_json_schema() for item in self.items],
-        })
-        return rv
-
 
 class Scalar(Variable):
     """A scalar. Either string, number, boolean or ``None``."""
     def __repr__(self):
         return '<scalar>'
-
-    def to_json_schema(self):
-        rv = super(Scalar, self).to_json_schema()
-        rv['anyOf'] = [
-            {'type': 'boolean'},
-            {'type': 'null'},
-            {'type': 'number'},
-            {'type': 'string'},
-        ]
-        return rv
 
 
 class String(Scalar):
@@ -276,21 +242,11 @@ class String(Scalar):
     def __repr__(self):
         return '<string>'
 
-    def to_json_schema(self):
-        rv = Variable.to_json_schema(self)
-        rv['type'] = 'string'
-        return rv
-
 
 class Number(Scalar):
     """A number."""
     def __repr__(self):
         return '<number>'
-
-    def to_json_schema(self):
-        rv = Variable.to_json_schema(self)
-        rv['type'] = 'number'
-        return rv
 
 
 class Boolean(Scalar):
@@ -298,28 +254,11 @@ class Boolean(Scalar):
     def __repr__(self):
         return '<boolean>'
 
-    def to_json_schema(self):
-        rv = Variable.to_json_schema(self)
-        rv['type'] = 'boolean'
-        return rv
-
 
 class Unknown(Variable):
     """A variable which type is unknown."""
     def __repr__(self):
         return '<unknown>'
-
-    def to_json_schema(self):
-        rv = super(Unknown, self).to_json_schema()
-        rv['anyOf'] = [
-            {'type': 'object'},
-            {'type': 'array'},
-            {'type': 'string'},
-            {'type': 'number'},
-            {'type': 'boolean'},
-            {'type': 'null'},
-        ]
-        return rv
 
 
 class Macro(object):

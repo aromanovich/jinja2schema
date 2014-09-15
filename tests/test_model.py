@@ -1,4 +1,5 @@
 # coding: utf-8
+from jinja2schema import core
 from jinja2schema.model import Dictionary, Scalar, List, Unknown, Tuple, Number, Boolean, String
 
 
@@ -33,41 +34,63 @@ def test_to_json_schema():
         {'type': 'null'},
     ]
 
-    json_schema = struct.to_json_schema()
-    assert json_schema['type'] == 'object'
-    assert set(json_schema['required']) == set(['string_var', 'list', 'boolean_var', 'number_var'])
-    assert json_schema['properties'] == {
-        'list': {
-            'title': 'list',
-            'type': 'array',
-            'items': {
+    for json_schema in [struct.to_json_schema(), core.to_json_schema(struct)]:
+        assert json_schema['type'] == 'object'
+        assert set(json_schema['required']) == set(['string_var', 'list', 'boolean_var', 'number_var'])
+        assert json_schema['properties'] == {
+            'list': {
+                'title': 'list',
                 'type': 'array',
-                'items': [{
-                    'title': 'a',
-                    'type': 'object',
-                    'required': ['field'],
-                    'properties': {
-                        'field': {
-                            'anyOf': scalar_anyof,
-                            'title': 'field'
-                        }
-                    },
-                }, {
-                    'title': 'b',
-                    'anyOf': scalar_anyof,
-                }],
+                'items': {
+                    'type': 'array',
+                    'items': [{
+                        'title': 'a',
+                        'type': 'object',
+                        'required': ['field'],
+                        'properties': {
+                            'field': {
+                                'anyOf': scalar_anyof,
+                                'title': 'field'
+                            }
+                        },
+                    }, {
+                        'title': 'b',
+                        'anyOf': scalar_anyof,
+                    }],
+                },
             },
+            'x': {
+                'anyOf': unknown_anyof,
+            },
+            'number_var': {
+                'type': 'number',
+            },
+            'string_var': {
+                'type': 'string',
+            },
+            'boolean_var': {
+                'type': 'boolean',
+            },
+        }
+
+
+def test_to_json_schema_custom_encoder():
+    class CustomJSONSchemaEncoder(core.JSONSchemaDraft4Encoder):
+        def encode(self, var):
+            if isinstance(var, (Scalar, Unknown)):
+                rv = self.encode_common_attrs(var)
+                rv['type'] = 'string'
+            else:
+                rv = super(CustomJSONSchemaEncoder, self).encode(var)
+            return rv
+
+    struct = Dictionary({
+        'scalar_var': Scalar(),
+    })
+    assert core.to_json_schema(struct, jsonschema_encoder=CustomJSONSchemaEncoder) == {
+        'type': 'object',
+        'properties': {
+            'scalar_var': {'type': 'string'},
         },
-        'x': {
-            'anyOf': unknown_anyof,
-        },
-        'number_var': {
-            'type': 'number',
-        },
-        'string_var': {
-            'type': 'string',
-        },
-        'boolean_var': {
-            'type': 'boolean',
-        },
+        'required': ['scalar_var'],
     }

@@ -6,7 +6,7 @@ jinja2schema.core
 import jinja2
 
 from .config import Config
-from .model import Dictionary
+from .model import Dictionary, List, Tuple, Scalar, Number, Unknown, Boolean, String
 from .visitors import visit
 from . import _compat
 
@@ -64,3 +64,74 @@ def infer(template, config=Config()):
              :class:`.exceptions.UnexpectedExpression`
     """
     return infer_from_ast(parse(template), config=config, ignore_constants=True)
+
+
+class JSONSchemaDraft4Encoder(object):
+    """Extensible JSON schema encoder for :class:`.model.Variable`s."""
+
+    def encode_common_attrs(self, var):
+        """Returns a subset of JSON schema of variable `var` that describes
+        attributes that are common for all the variable types, such as label.
+        """
+        rv = {}
+        if var.label:
+            rv['title'] = var.label
+        return rv
+
+    def encode(self, var):
+        """Returns a JSON schema of variable `var`.
+
+        :type var: :class:`.model.Variable`
+        :rtype: :class:`dict`
+        """
+        rv = self.encode_common_attrs(var)
+        if isinstance(var, Dictionary):
+            rv.update({
+                'type': 'object',
+                'properties': dict((k, self.encode(v)) for k, v in var.iteritems()),
+                'required': [k for k, v in var.iteritems() if v.required],
+            })
+        elif isinstance(var, List):
+            rv.update({
+                'type': 'array',
+                'items': self.encode(var.item),
+            })
+        elif isinstance(var, Tuple):
+            rv.update({
+                'type': 'array',
+                'items': [self.encode(item) for item in var.items],
+            })
+        elif isinstance(var, Unknown):
+            rv['anyOf'] = [
+                {'type': 'object'},
+                {'type': 'array'},
+                {'type': 'string'},
+                {'type': 'number'},
+                {'type': 'boolean'},
+                {'type': 'null'},
+            ]
+        elif isinstance(var, String):
+            rv['type'] = 'string'
+        elif isinstance(var, Number):
+            rv['type'] = 'number'
+        elif isinstance(var, Boolean):
+            rv['type'] = 'boolean'
+        elif isinstance(var, Scalar):
+            rv['anyOf'] = [
+                {'type': 'boolean'},
+                {'type': 'null'},
+                {'type': 'number'},
+                {'type': 'string'},
+            ]
+        return rv
+
+
+def to_json_schema(var, jsonschema_encoder=JSONSchemaDraft4Encoder):
+    """
+    :param var: a variable
+    :type var: :class:`.model.Variable`
+    :param jsonschema_encoder: JSON schema encoder
+    :type jsonschema_encoder: subclass of :class:`JSONSchemaEncoder`
+    :return: :class:`dict`
+    """
+    return jsonschema_encoder().encode(var)
