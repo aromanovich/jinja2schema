@@ -36,11 +36,12 @@ class Variable(object):
 
         Is true if the variable occurs **only** within the ``default`` filter.
     """
-    def __init__(self, label=None, linenos=None, constant=False,
+    def __init__(self, label=None, linenos=None, constant=False, assigned=False,
                  may_be_defined=False, used_with_default=False):
         self.label = label
         self.linenos = linenos if linenos is not None else []
         self.constant = constant
+        self.assigned = assigned
         self.may_be_defined = may_be_defined
         self.used_with_default = used_with_default
 

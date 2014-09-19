@@ -5,7 +5,8 @@ from jinja2schema.config import Config
 
 from jinja2schema.core import infer
 from jinja2schema.exceptions import MergeException, UnexpectedExpression
-from jinja2schema.model import List, Dictionary, Scalar, Unknown, String, Boolean, Tuple
+from jinja2schema.model import List, Dictionary, Scalar, Unknown, String, Boolean, Tuple, Number
+from jinja2schema.util import debug_repr
 
 
 def test_may_be_defined():
@@ -468,5 +469,29 @@ def test_basics_101():
             }, label='FILTERS', linenos=[2, 3]),
             'GEO': Scalar(label='GEO', linenos=[4]),
         }, label='section', linenos=[2, 3, 4])
+    })
+    assert struct == expected_struct
+
+
+def test_basics_102():
+    template = '''
+    {%- if x is undefined %}
+        {{ test }}
+    {%- endif %}
+
+    {%- if y is undefined %}
+        {% set y = 123 %}
+    {%- endif %}
+
+    {%- if z is undefined %}
+        {{ z }}
+    {%- endif %}
+    '''
+    struct = infer(template)
+    expected_struct = Dictionary({
+        'x': Unknown(label='x', may_be_defined=True, linenos=[2]),
+        'test': Scalar(label='test', linenos=[3]),
+        'y': Number(label='y', may_be_defined=True, linenos=[6, 7]),
+        'z': Scalar(label='z', linenos=[10, 11]),
     })
     assert struct == expected_struct

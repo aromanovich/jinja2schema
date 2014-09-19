@@ -22,7 +22,7 @@ def _debug_repr(var):
         if isinstance(var, Dictionary):
             rv.append('Dictionary({}, {{'.format(_format_attrs(var)))
             content = []
-            for key, value in var.iteritems():
+            for key, value in sorted(var.iteritems()):
                 key_repr = key + ': '
                 value_repr = _debug_repr(value)
                 content.append(key_repr + value_repr[0])

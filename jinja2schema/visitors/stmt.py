@@ -9,6 +9,7 @@ Statement visitors return :class:`.models.Dictionary` of structures of variables
 import functools
 
 from jinja2 import nodes
+from jinja2schema.util import debug_repr
 
 from ..model import Scalar, Dictionary, List, Unknown, Tuple, Boolean, Macro
 from ..mergers import merge, merge_many
@@ -100,8 +101,9 @@ def visit_if(ast, macroses, config):
         if ast.test.name == 'defined':
             lookup_struct = else_struct
         var_name = ast.test.node.name
-        if lookup_struct is not None and var_name in lookup_struct:
-            struct[var_name].may_be_defined = True
+        struct[var_name].may_be_defined = (lookup_struct is None or
+                                           var_name not in lookup_struct or
+                                           lookup_struct[var_name].assigned)
     return struct
 
 
@@ -122,6 +124,7 @@ def visit_assign(ast, macroses, config):
         for var_name, var_ast in variables:
             var_rtype, var_struct = visit_expr(var_ast, Context(predicted_struct=Unknown.from_ast(var_ast)), macroses, config)
             var_rtype.constant = True
+            var_rtype.assigned = True
             var_rtype.label = var_name
             struct = merge_many(struct, var_struct, Dictionary({
                 var_name: var_rtype,
