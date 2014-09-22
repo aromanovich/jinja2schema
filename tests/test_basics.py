@@ -483,6 +483,10 @@ def test_basics_102():
         {% set y = 123 %}
     {%- endif %}
 
+    {%- if y is defined %}
+        {{ y }}
+    {%- endif %}
+
     {%- if z is undefined %}
         {{ z }}
     {%- endif %}
@@ -491,7 +495,7 @@ def test_basics_102():
     expected_struct = Dictionary({
         'x': Unknown(label='x', may_be_defined=True, linenos=[2]),
         'test': Scalar(label='test', linenos=[3]),
-        'y': Number(label='y', may_be_defined=True, linenos=[6, 7]),
-        'z': Scalar(label='z', linenos=[10, 11]),
+        'y': Number(label='y', may_be_defined=True, linenos=[6, 7, 10, 11]),
+        'z': Scalar(label='z', linenos=[14, 15]),
     })
     assert struct == expected_struct
