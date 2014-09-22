@@ -499,3 +499,24 @@ def test_basics_102():
         'z': Scalar(label='z', linenos=[14, 15]),
     })
     assert struct == expected_struct
+
+
+def test_basics_103():
+    config_2 = Config()
+    config_2.CONSIDER_CONDITIONS_AS_BOOLEAN = True
+    template = '''
+    {%- if new_configuration is undefined %}
+      {%- if production is defined and production %}
+        {% set new_configuration = 'prefix-' ~ timestamp %}
+      {%- else %}
+        {% set new_configuration = 'prefix-' ~ timestamp %}
+      {%- endif %}
+    {%- endif %}
+    '''
+    struct = infer(template, config_2)
+    expected_struct = Dictionary({
+        'new_configuration': String(label='new_configuration', may_be_defined=True, linenos=[2, 4, 6]),
+        'production': Boolean(label='production', may_be_defined=True, linenos=[3]),
+        'timestamp': String(label='timestamp', linenos=[4, 6]),
+    })
+    assert struct == expected_struct

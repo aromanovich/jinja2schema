@@ -94,13 +94,23 @@ def visit_if(ast, macroses, config):
     else_struct = visit_many(ast.else_, macroses, config, predicted_struct_cls=Scalar) if ast.else_ else Dictionary()
     struct = merge_many(test_struct, if_struct, else_struct)
 
-    if isinstance(ast.test, nodes.Test) and isinstance(ast.test.node, nodes.Name):
+    def is_base_case(ast):
+        return (isinstance(ast, nodes.Test) and
+                isinstance(ast.node, nodes.Name) and
+                ast.name in ('defined', 'undefined'))
+
+    if is_base_case(ast.test) or (isinstance(ast.test, nodes.And) and is_base_case(ast.test.left)):
+        # XXX it is a hack
         lookup_struct = None
-        if ast.test.name == 'undefined':
+        if isinstance(ast.test, nodes.And):
+            test_ast = ast.test.left
+        else:
+            test_ast = ast.test
+        if test_ast.name == 'undefined':
             lookup_struct = if_struct
-        if ast.test.name == 'defined':
+        if test_ast.name == 'defined':
             lookup_struct = else_struct
-        var_name = ast.test.node.name
+        var_name = test_ast.node.name
         struct[var_name].may_be_defined = (lookup_struct is None or
                                            var_name not in lookup_struct or
                                            lookup_struct[var_name].assigned)
