@@ -223,7 +223,7 @@ class Tuple(Variable):
 
     def clone(self):
         rv = super(Tuple, self).clone()
-        rv.items = tuple(s.clone() for s in self.items)
+        rv.items = self.items and tuple(s.clone() for s in self.items)
         return rv
 
     @classmethod

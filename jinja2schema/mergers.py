@@ -22,14 +22,17 @@ def merge(fst, snd):
 
         ``fst`` must reflect expressions that occur in template **before** the expressions of ``snd``.
     """
-    assert (not (fst.linenos and snd.linenos) or
-            (fst.linenos == snd.linenos) or  # TODO this is a hack
-            max(fst.linenos) <= min(snd.linenos))
+
+    # useful for debugging:
+    #
+    # assert (not (fst.linenos and snd.linenos) or
+    #         (fst.linenos == snd.linenos) or  # TODO this is a hack
+    #         max(fst.linenos) <= min(snd.linenos))
 
     if isinstance(fst, Unknown):
-        result = snd
+        result = snd.clone()
     elif isinstance(snd, Unknown):
-        result = fst
+        result = fst.clone()
     elif isinstance(fst, Scalar) and isinstance(snd, Scalar):
         fst_type = type(fst)
         snd_type = type(snd)
@@ -45,9 +48,9 @@ def merge(fst, snd):
             if k in fst and k in snd:
                 result[k] = merge(fst[k], snd[k])
             elif k in fst:
-                result[k] = fst[k]
+                result[k] = fst[k].clone()
             elif k in snd:
-                result[k] = snd[k]
+                result[k] = snd[k].clone()
     elif isinstance(fst, List) and isinstance(snd, List):
         result = List(merge(fst.item, snd.item))
     elif isinstance(fst, Tuple) and isinstance(snd, Tuple):
@@ -63,6 +66,7 @@ def merge(fst, snd):
     result.linenos = list(sorted(set(fst.linenos + snd.linenos)))
     result.constant = fst.constant
     result.may_be_defined = fst.may_be_defined
+    result.assigned = fst.assigned
     result.used_with_default = fst.used_with_default and snd.used_with_default
     return result
 
