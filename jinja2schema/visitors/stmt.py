@@ -94,26 +94,17 @@ def visit_if(ast, macroses, config):
     else_struct = visit_many(ast.else_, macroses, config, predicted_struct_cls=Scalar) if ast.else_ else Dictionary()
     struct = merge_many(test_struct, if_struct, else_struct)
 
-    def is_base_case(ast):
-        return (isinstance(ast, nodes.Test) and
-                isinstance(ast.node, nodes.Name) and
-                ast.name in ('defined', 'undefined'))
-
-    if is_base_case(ast.test) or (isinstance(ast.test, nodes.And) and is_base_case(ast.test.left)):
-        # XXX it is a hack
-        lookup_struct = None
-        if isinstance(ast.test, nodes.And):
-            test_ast = ast.test.left
-        else:
-            test_ast = ast.test
-        if test_ast.name == 'undefined':
-            lookup_struct = if_struct
-        if test_ast.name == 'defined':
-            lookup_struct = else_struct
-        var_name = test_ast.node.name
-        struct[var_name].may_be_defined = (lookup_struct is None or
-                                           var_name not in lookup_struct or
-                                           lookup_struct[var_name].assigned)
+    for var_name, var_struct in test_struct.iteritems():
+        if var_struct.checked_as_defined or var_struct.checked_as_undefined:
+            if var_struct.checked_as_undefined:
+                lookup_struct = if_struct
+            elif var_struct.checked_as_defined:
+                lookup_struct = else_struct
+            struct[var_name].may_be_defined = (lookup_struct and
+                                               var_name in lookup_struct and
+                                               lookup_struct[var_name].assigned)
+        struct[var_name].checked_as_defined = test_struct[var_name].checked_as_defined
+        struct[var_name].checked_as_undefined = test_struct[var_name].checked_as_undefined
     return struct
 
 

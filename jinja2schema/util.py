@@ -8,7 +8,8 @@ from .model import Dictionary, Scalar, List, Unknown, Tuple
 
 def _format_attrs(var):
     return (u'label={0.label}, required={0.required}, '
-            u'constant={0.constant}, linenos={0.linenos}').format(var).encode('utf-8')
+            u'constant={0.constant}, linenos={0.linenos}, '
+            u'c_as_u={0.checked_as_undefined}, c_as_d={0.checked_as_defined}').format(var).encode('utf-8')
 
 
 def _indent(lines, spaces):

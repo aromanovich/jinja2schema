@@ -37,13 +37,16 @@ class Variable(object):
         Is true if the variable occurs **only** within the ``default`` filter.
     """
     def __init__(self, label=None, linenos=None, constant=False, assigned=False,
-                 may_be_defined=False, used_with_default=False):
+                 may_be_defined=False, used_with_default=False,
+                 checked_as_undefined=False, checked_as_defined=False):
         self.label = label
         self.linenos = linenos if linenos is not None else []
         self.constant = constant
         self.assigned = assigned
         self.may_be_defined = may_be_defined
         self.used_with_default = used_with_default
+        self.checked_as_undefined = checked_as_undefined
+        self.checked_as_defined = checked_as_defined
 
     def clone(self):
         cls = type(self)
@@ -76,7 +79,10 @@ class Variable(object):
 
     @property
     def required(self):
-        return not self.may_be_defined and not self.used_with_default
+        return (not self.may_be_defined and
+                not self.used_with_default and
+                not self.checked_as_defined and
+                not self.checked_as_undefined)
 
     def __eq__(self, other):
         return (
@@ -85,7 +91,9 @@ class Variable(object):
             self.used_with_default == other.used_with_default and
             self.required == other.required and
             self.linenos == other.linenos and
-            self.label == other.label
+            self.label == other.label and
+            self.checked_as_undefined == other.checked_as_undefined and
+            self.checked_as_defined == other.checked_as_defined
         )
 
     def __ne__(self, other):

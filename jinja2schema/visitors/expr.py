@@ -9,9 +9,10 @@ Expression visitors return a tuple which contains expression type and expression
 import functools
 
 from jinja2 import nodes
+from jinja2schema.util import debug_repr
 
 from ..model import Scalar, Dictionary, List, Unknown, Tuple, String, Number, Boolean
-from ..mergers import merge_rtypes, merge, merge_many
+from ..mergers import merge_rtypes, merge, merge_many, merge_bool_expr_structs
 from ..exceptions import InvalidExpression, UnexpectedExpression, MergeException
 from .. import _compat
 from .util import visit_many
@@ -182,7 +183,8 @@ def _visit_dict(ast, ctx, macroses, items, config):
 def visit_bin_expr(ast, ctx, macroses, config):
     l_rtype, l_struct = visit_expr(ast.left, ctx, macroses, config)
     r_rtype, r_struct = visit_expr(ast.right, ctx, macroses, config)
-    return merge_rtypes(l_rtype, r_rtype, operator=ast.operator), merge(l_struct, r_struct)
+    rv = merge_bool_expr_structs(l_struct, r_struct)
+    return merge_rtypes(l_rtype, r_rtype, operator=ast.operator), rv
 
 
 @visits_expr(nodes.UnaryExpr)
@@ -275,6 +277,10 @@ def visit_test(ast, ctx, macroses, config):
     elif ast.name in ('defined', 'undefined', 'equalto', 'iterable', 'mapping',
                       'none', 'number', 'sameas', 'sequence', 'string'):
         predicted_struct = Unknown.from_ast(ast.node)
+        if ast.name == 'defined':
+            predicted_struct.checked_as_defined = True
+        elif ast.name == 'undefined':
+            predicted_struct.checked_as_undefined = True
     else:
         raise InvalidExpression(ast, 'unknown test "{0}"'.format(ast.name))
     rtype, struct = visit_expr(ast.node, Context(return_struct_cls=Boolean,
@@ -306,9 +312,18 @@ def visit_cond_expr(ast, ctx, macroses, config):
     struct = merge_many(if_struct, test_struct, else_struct)
     rtype = merge_rtypes(if_rtype, else_rtype)
 
-    if (isinstance(ast.test, nodes.Test) and isinstance(ast.test.node, nodes.Name) and
-            ast.test.name in ('defined', 'undefined')):
-        struct[ast.test.node.name].may_be_defined = True
+    for var_name, var_struct in test_struct.iteritems():
+        if var_struct.checked_as_defined or var_struct.checked_as_undefined:
+            if var_struct.checked_as_undefined:
+                lookup_struct = if_struct
+            elif var_struct.checked_as_defined:
+                lookup_struct = else_struct
+            struct[var_name].may_be_defined = (lookup_struct and
+                                               var_name in lookup_struct and
+                                               lookup_struct[var_name].assigned)
+        struct[var_name].checked_as_defined = test_struct[var_name].checked_as_defined
+        struct[var_name].checked_as_undefined = test_struct[var_name].checked_as_undefined
+
     return rtype, struct
 
 

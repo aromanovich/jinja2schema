@@ -159,8 +159,8 @@ def test_basics_4():
     struct = infer(template)
     expected_struct = Dictionary({
         'configuration': String(label='configuration',
-                                may_be_defined=True, constant=False, linenos=[6, 7]),
-        'queue': Scalar(label='queue', may_be_defined=True, constant=False, linenos=[9]),
+                                may_be_defined=True, checked_as_undefined=True, constant=False, linenos=[6, 7]),
+        'queue': Scalar(label='queue', checked_as_defined=True, constant=False, linenos=[9]),
         'timestamp': String(label='timestamp', constant=False, linenos=[7])
     })
     assert struct == expected_struct
@@ -493,17 +493,17 @@ def test_basics_102():
     '''
     struct = infer(template)
     expected_struct = Dictionary({
-        'x': Unknown(label='x', may_be_defined=True, linenos=[2]),
+        'x': Unknown(label='x', checked_as_undefined=True, linenos=[2]),
         'test': Scalar(label='test', linenos=[3]),
         'y': Number(label='y', may_be_defined=True, linenos=[6, 7, 10, 11]),
-        'z': Scalar(label='z', linenos=[14, 15]),
+        'z': Scalar(label='z', checked_as_undefined=True, linenos=[14, 15]),
     })
     assert struct == expected_struct
 
 
 def test_basics_103():
-    config_2 = Config()
-    config_2.CONSIDER_CONDITIONS_AS_BOOLEAN = True
+    config = Config()
+    config.CONSIDER_CONDITIONS_AS_BOOLEAN = True
     template = '''
     {%- if new_configuration is undefined %}
       {%- if production is defined and production %}
@@ -513,10 +513,86 @@ def test_basics_103():
       {%- endif %}
     {%- endif %}
     '''
-    struct = infer(template, config_2)
+    struct = infer(template, config)
     expected_struct = Dictionary({
-        'new_configuration': String(label='new_configuration', may_be_defined=True, linenos=[2, 4, 6]),
-        'production': Boolean(label='production', may_be_defined=True, linenos=[3]),
+        'new_configuration': String(label='new_configuration', may_be_defined=True, checked_as_undefined=True, linenos=[2, 4, 6]),
+        'production': Boolean(label='production', checked_as_defined=True, linenos=[3]),
         'timestamp': String(label='timestamp', linenos=[4, 6]),
+    })
+    assert struct == expected_struct
+
+
+def test_basics_104():
+    template = '''{{ 'x and y' if x and y is defined else ':(' }}'''
+    config = Config()
+    config.CONSIDER_CONDITIONS_AS_BOOLEAN = True
+    struct = infer(template, config)
+    expected_struct = Dictionary({
+        'x': Boolean(label='x', linenos=[1]),
+        'y': Unknown(label='y', checked_as_defined=True, linenos=[1]),
+    })
+    assert struct == expected_struct
+
+    template = '''
+    {% if x is defined and x.a == 'a' %}
+        {{ x.b }}
+    {% endif %}
+    '''
+    struct = infer(template, config)
+    expected_struct = Dictionary({
+        'x': Dictionary({
+            'a': Unknown(label='a', linenos=[2]),
+            'b': Scalar(label='b', linenos=[3]),
+
+        }, label='x', checked_as_defined=True, linenos=[2, 3])
+    })
+    assert struct == expected_struct
+
+    template = '''
+    {% if x is undefined and x.a == 'a' %}
+        {{ x.b }}
+    {% endif %}
+    '''
+    struct = infer(template, config)
+    expected_struct = Dictionary({
+        'x': Dictionary({
+            'a': Unknown(label='a', linenos=[2]),
+            'b': Scalar(label='b', linenos=[3]),
+
+        }, label='x', linenos=[2, 3])
+    })
+    assert struct == expected_struct
+
+    template = '''
+    {% if x is undefined %}
+        none
+    {% endif %}
+    {{ x }}
+    '''
+    struct = infer(template, config)
+    expected_struct = Dictionary({
+        'x': Scalar(label='x', linenos=[2, 5]),
+    })
+    assert struct == expected_struct
+
+    template = '''
+    {% if x is defined %}
+        none
+    {% endif %}
+    {{ x }}
+    '''
+    struct = infer(template, config)
+    expected_struct = Dictionary({
+        'x': Scalar(label='x', linenos=[2, 5]),
+    })
+    assert struct == expected_struct
+
+    template = '''
+    queue: {{ queue if queue is defined else 'wizard' }}
+    queue: {{ queue if queue is defined else 'wizard' }}
+    '''
+    struct = infer(template, config)
+    expected_struct = Dictionary({
+        'queue': Scalar(label='queue', linenos=[2, 3], checked_as_defined=True)
     })
     assert struct == expected_struct

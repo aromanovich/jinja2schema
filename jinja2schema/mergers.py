@@ -4,13 +4,14 @@ jinja2schema.mergers
 ~~~~~~~~~~~~~~~~~~~~
 """
 import itertools
+from jinja2schema.util import debug_repr
 
 from .model import Scalar, Dictionary, List, Unknown, Tuple
 from .exceptions import MergeException
 from ._compat import zip_longest
 
 
-def merge(fst, snd):
+def merge(fst, snd, custom_merger=None):
     """Merges two variables.
 
     :param fst: first variable
@@ -46,20 +47,21 @@ def merge(fst, snd):
         result = Dictionary()
         for k in set(itertools.chain(fst.iterkeys(), snd.iterkeys())):
             if k in fst and k in snd:
-                result[k] = merge(fst[k], snd[k])
+                result[k] = merge(fst[k], snd[k], custom_merger=custom_merger)
             elif k in fst:
                 result[k] = fst[k].clone()
             elif k in snd:
                 result[k] = snd[k].clone()
     elif isinstance(fst, List) and isinstance(snd, List):
-        result = List(merge(fst.item, snd.item))
+        result = List(merge(fst.item, snd.item, custom_merger=custom_merger))
     elif isinstance(fst, Tuple) and isinstance(snd, Tuple):
         if fst.items is snd.items is None:
             result = Tuple(None)
         else:
             if len(fst.items) != len(snd.items) and not (fst.may_be_extended or snd.may_be_extended):
                 raise MergeException(fst, snd)
-            result = Tuple([merge(a, b) for a, b in zip_longest(fst.items, snd.items, fillvalue=Unknown())])
+            result = Tuple([merge(a, b, custom_merger=custom_merger)
+                            for a, b in zip_longest(fst.items, snd.items, fillvalue=Unknown())])
     else:
         raise MergeException(fst, snd)
     result.label = fst.label or snd.label
@@ -68,6 +70,10 @@ def merge(fst, snd):
     result.may_be_defined = fst.may_be_defined
     result.assigned = fst.assigned
     result.used_with_default = fst.used_with_default and snd.used_with_default
+    result.checked_as_defined = fst.checked_as_defined and snd.checked_as_defined
+    result.checked_as_undefined = fst.checked_as_undefined and snd.checked_as_undefined
+    if callable(custom_merger):
+        result = custom_merger(fst, snd, result)
     return result
 
 
@@ -77,6 +83,14 @@ def merge_many(fst, snd, *args):
         return merge_many(struct, *args)
     else:
         return struct
+
+
+def merge_bool_expr_structs(fst, snd, operator=None):
+    def merger(fst, snd, result):
+        result.checked_as_defined = fst.checked_as_defined
+        result.checked_as_undefined = fst.checked_as_undefined and snd.checked_as_undefined
+        return result
+    return merge(fst, snd, custom_merger=merger)
 
 
 def merge_rtypes(fst, snd, operator=None):

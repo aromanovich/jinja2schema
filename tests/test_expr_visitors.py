@@ -19,18 +19,23 @@ def get_context(ast):
 
 
 def test_cond_expr():
-    templates = (
-        '''{{ queue if queue is defined else 'wizard' }}''',
-        '''{{ queue if queue is undefined else 'wizard' }}'''
-    )
-    for template in templates:
-        ast = parse(template).find(nodes.CondExpr)
-        rtype, struct = visit_cond_expr(ast, get_context(ast), {}, test_config)
+    template = '''{{ queue if queue is defined else 'wizard' }}''',
+    ast = parse(template).find(nodes.CondExpr)
+    rtype, struct = visit_cond_expr(ast, get_context(ast), {}, test_config)
 
-        expected_struct = Dictionary({
-            'queue': Scalar(label='queue', linenos=[1], may_be_defined=True)
-        })
-        assert struct == expected_struct
+    expected_struct = Dictionary({
+        'queue': Scalar(label='queue', linenos=[1], checked_as_defined=True)
+    })
+    assert struct == expected_struct
+
+    template = '''{{ queue if queue is undefined else 'wizard' }}'''
+    ast = parse(template).find(nodes.CondExpr)
+    rtype, struct = visit_cond_expr(ast, get_context(ast), {}, test_config)
+
+    expected_struct = Dictionary({
+        'queue': Scalar(label='queue', linenos=[1], checked_as_undefined=True)
+    })
+    assert struct == expected_struct
 
 
 def test_getattr_1():
