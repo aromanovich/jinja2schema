@@ -9,7 +9,6 @@ Expression visitors return a tuple which contains expression type and expression
 import functools
 
 from jinja2 import nodes
-from jinja2schema.util import debug_repr
 
 from ..model import Scalar, Dictionary, List, Unknown, Tuple, String, Number, Boolean
 from ..mergers import merge_rtypes, merge, merge_many, merge_bool_expr_structs
@@ -547,10 +546,10 @@ def visit_const(ast, ctx, macroses, config):
     ctx.meet(Scalar(), ast)
     if isinstance(ast.value, _compat.string_types):
         rtype = String.from_ast(ast, constant=True)
-    elif isinstance(ast.value, (int, float, complex)):
-        rtype = Number.from_ast(ast, constant=True)
     elif isinstance(ast.value, bool):
         rtype = Boolean.from_ast(ast, constant=True)
+    elif isinstance(ast.value, (int, float, complex)):
+        rtype = Number.from_ast(ast, constant=True)
     else:
         rtype = Scalar.from_ast(ast, constant=True)
     return rtype, Dictionary()

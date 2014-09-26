@@ -596,3 +596,4 @@ def test_basics_104():
         'queue': Scalar(label='queue', linenos=[2, 3], checked_as_defined=True)
     })
     assert struct == expected_struct
+

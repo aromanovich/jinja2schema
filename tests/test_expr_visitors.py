@@ -5,10 +5,10 @@ from jinja2 import nodes
 from jinja2schema.config import Config
 from jinja2schema.core import parse
 from jinja2schema.visitors.expr import (Context, visit_getitem, visit_cond_expr, visit_test,
-                                        visit_getattr, visit_compare, visit_filter, visit_call, visit_dict)
+                                        visit_getattr, visit_compare, visit_filter, visit_call,
+                                        visit_const)
 from jinja2schema.exceptions import UnexpectedExpression, InvalidExpression
 from jinja2schema.model import Dictionary, Scalar, List, Unknown, String, Number, Boolean, Tuple
-from jinja2schema.util import debug_repr
 
 
 test_config = Config()
@@ -340,3 +340,10 @@ def test_compare():
     rtype, struct = visit_compare(compare_ast, get_context(compare_ast), {}, test_config)
     expected_rtype = Boolean(linenos=[1])
     assert rtype == expected_rtype
+
+
+def test_const():
+    template = '''{{ false }}'''
+    const_ast = parse(template).find(nodes.Const)
+    rtype, struct = visit_const(const_ast, get_context(const_ast), {}, test_config)
+    assert rtype == Boolean(constant=True, linenos=[1])
