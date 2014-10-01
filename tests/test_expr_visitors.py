@@ -347,3 +347,15 @@ def test_const():
     const_ast = parse(template).find(nodes.Const)
     rtype, struct = visit_const(const_ast, get_context(const_ast), {}, test_config)
     assert rtype == Boolean(constant=True, linenos=[1])
+
+
+def test_call():
+    template = '''{{ x.endswith('_FAST') }}'''
+    call_ast = parse(template).find(nodes.Call)
+    rtype, struct = visit_call(call_ast, get_context(call_ast), {}, test_config)
+    expected_rtype = Boolean()
+    expected_struct = Dictionary({
+        'x': String(label='x', linenos=[1])
+    })
+    assert rtype == expected_rtype
+    assert struct == expected_struct

@@ -438,6 +438,11 @@ def visit_call(ast, ctx, macroses, config):
             rtype, struct = visit_expr(
                 ast.node.node, Context(predicted_struct=Dictionary.from_ast(ast.node.node)), macroses, config)
             return List(Unknown()), struct
+        if ast.node.attr in ('startswith', 'endswith'):
+            ctx.meet(Boolean(), ast)
+            rtype, struct = visit_expr(
+                ast.node.node, Context(predicted_struct=String.from_ast(ast.node.node)), macroses, config)
+            return Boolean(), struct
 
 
 
