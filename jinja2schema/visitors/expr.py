@@ -431,7 +431,7 @@ def visit_call(ast, ctx, macroses, config):
                 raise InvalidExpression(ast, 'dict accepts only keyword arguments')
             return _visit_dict(ast, ctx, macroses, [(kwarg.key, kwarg.value) for kwarg in ast.kwargs], config)
         else:
-            raise InvalidExpression(ast, '"{0}" call is not supported yet'.format(ast.node.name))
+            raise InvalidExpression(ast, '"{0}" call is not supported'.format(ast.node.name))
     elif isinstance(ast.node, nodes.Getattr):
         if ast.node.attr in ('keys', 'iterkeys', 'values', 'itervalues'):
             ctx.meet(List(Unknown()), ast)
@@ -443,7 +443,8 @@ def visit_call(ast, ctx, macroses, config):
             rtype, struct = visit_expr(
                 ast.node.node, Context(predicted_struct=String.from_ast(ast.node.node)), macroses, config)
             return Boolean(), struct
-
+        else:
+            raise InvalidExpression(ast, '"{0}" call is not supported'.format(ast.node.attr))
 
 
 @visits_expr(nodes.Filter)

@@ -359,3 +359,9 @@ def test_call():
     })
     assert rtype == expected_rtype
     assert struct == expected_struct
+
+    template = '''{{ x.some_unknown_f() }}'''
+    call_ast = parse(template).find(nodes.Call)
+    with pytest.raises(InvalidExpression) as e:
+        visit_call(call_ast, get_context(call_ast), {}, test_config)
+    assert str(e.value) == 'line 1: "some_unknown_f" call is not supported'
