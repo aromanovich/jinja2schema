@@ -6,8 +6,8 @@ from jinja2schema.config import Config
 from jinja2schema.core import parse, infer
 from jinja2schema.visitors.stmt import visit_macro
 from jinja2schema.exceptions import MergeException, InvalidExpression
-from jinja2schema.model import Dictionary, Scalar, List, Unknown, Tuple, String, Number, Macro
-from jinja2schema.util import debug_repr
+from jinja2schema.model import Dictionary, Scalar, String, Number, Macro
+
 
 test_config = Config()
 
