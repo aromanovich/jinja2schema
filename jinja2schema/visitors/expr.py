@@ -455,12 +455,15 @@ def visit_filter(ast, ctx, macroses, config):
                     'safe', 'string', 'striptags', 'title', 'trim', 'truncate', 'upper',
                     'urlencode', 'urlize', 'wordcount', 'wordwrap', 'e'):
         ctx.meet(Scalar(), ast)
-        if ast.name in ('abs', 'float', 'int', 'round', ):
+        if ast.name in ('abs', 'round'):
             node_struct = Number.from_ast(ast.node)
+            return_struct_cls = Number
+        elif ast.name in ('float', 'int'):
+            node_struct = Scalar.from_ast(ast.node)
             return_struct_cls = Number
         elif ast.name in ('striptags', 'capitalize', 'center', 'escape', 'forceescape', 'format', 'indent',
                           'replace', 'safe', 'title', 'trim', 'truncate', 'upper', 'urlencode',
-                          'urliize', 'wordwrap', 'e'):
+                          'urlize', 'wordwrap', 'e'):
             node_struct = String.from_ast(ast.node)
             return_struct_cls = String
         elif ast.name == 'filesizeformat':
@@ -476,10 +479,14 @@ def visit_filter(ast, ctx, macroses, config):
             node_struct = Scalar.from_ast(ast.node)
     elif ast.name in ('batch', 'slice'):
         ctx.meet(List(List(Unknown())), ast)
-        node_struct = merge(
-            List(List(Unknown(), linenos=[ast.node.lineno]), linenos=[ast.node.lineno]),
-            ctx.get_predicted_struct()
-        ).item
+        rtype = List(List(Unknown(), linenos=[ast.node.lineno]), linenos=[ast.node.lineno])
+        node_struct = merge(rtype, ctx.get_predicted_struct()).item
+        _, struct = visit_expr(ast.node, Context(
+            ctx=ctx,
+            return_struct_cls=return_struct_cls,
+            predicted_struct=node_struct
+        ), macroses, config)
+        return rtype, struct
     elif ast.name == 'default':
         default_value_rtype, default_value_struct = visit_expr(
             ast.args[0], Context(predicted_struct=Unknown.from_ast(ast.args[0])), macroses, config)
@@ -498,7 +505,8 @@ def visit_filter(ast, ctx, macroses, config):
             return_struct_cls=String,
             predicted_struct=node_struct
         ), macroses, config)
-        arg_rtype, arg_struct = visit_expr(ast.args[0], Context(predicted_struct=Scalar.from_ast(ast.args[0])), macroses, config)
+        arg_rtype, arg_struct = visit_expr(ast.args[0],
+                                           Context(predicted_struct=String.from_ast(ast.args[0])), macroses, config)
         return rtype, merge(struct, arg_struct)
     elif ast.name in ('first', 'last', 'random', 'length', 'sum'):
         if ast.name in ('first', 'last', 'random'):

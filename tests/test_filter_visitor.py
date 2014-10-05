@@ -1,8 +1,9 @@
-from jinja2 import nodes
 import pytest
+from jinja2 import nodes
+
 from jinja2schema import parse, Config, UnexpectedExpression, InvalidExpression
 from jinja2schema.visitors.expr import visit_filter, Context
-from jinja2schema.model import Dictionary, Scalar, List, Unknown, String, Number, Boolean, Tuple
+from jinja2schema.model import Dictionary, Scalar, List, Unknown, String, Number
 
 
 test_config = Config()
@@ -12,25 +13,47 @@ def get_context(ast):
     return Context(return_struct_cls=Scalar, predicted_struct=Scalar.from_ast(ast))
 
 
-def test_filter_1():
-    template = '{{ x|striptags }}'
-    ast = parse(template).find(nodes.Filter)
-    rtype, struct = visit_filter(ast, get_context(ast), {}, test_config)
+def test_string_filters():
+    for filter in ('striptags', 'capitalize', 'title', 'upper', 'urlize'):
+        template = '{{ x|' + filter + ' }}'
+        ast = parse(template).find(nodes.Filter)
 
-    expected_struct = Dictionary({
-        'x': String(label='x', linenos=[1]),
-    })
-    assert struct == expected_struct
+        ctx = Context(return_struct_cls=Scalar, predicted_struct=Scalar.from_ast(ast))
+        rtype, struct = visit_filter(ast, ctx, {}, test_config)
 
-
-def test_filter_2():
-    template = '''{{ items|batch(3, '&nbsp;') }}'''
-    ast = parse(template).find(nodes.Filter)
-    with pytest.raises(UnexpectedExpression):
-        visit_filter(ast, get_context(ast), {}, test_config)
+        expected_rtype = String(label='x', linenos=[1])
+        expected_struct = Dictionary({
+            'x': String(label='x', linenos=[1]),
+        })
+        assert rtype == expected_rtype
+        assert struct == expected_struct
 
 
-def test_filter_3():
+def test_batch_and_slice_filters():
+    for filter in ('batch', 'slice'):
+        template = '{{ items|' + filter + '(3, "&nbsp;") }}'
+        ast = parse(template).find(nodes.Filter)
+
+        unknown_ctx = Context(predicted_struct=Unknown.from_ast(ast))
+        rtype, struct = visit_filter(ast, unknown_ctx, {}, test_config)
+
+        expected_rtype = List(List(Unknown(), linenos=[1]), linenos=[1])
+        assert rtype == expected_rtype
+
+        expected_struct = Dictionary({
+            'items': List(Unknown(), label='items', linenos=[1]),
+        })
+        assert struct == expected_struct
+
+        scalar_ctx = Context(predicted_struct=Scalar.from_ast(ast))
+        with pytest.raises(UnexpectedExpression) as e:
+            visit_filter(ast, scalar_ctx, {}, test_config)
+        assert str(e.value) == ('conflict on the line 1\n'
+                                'got: AST node jinja2.nodes.Filter of structure [[<unknown>]]\n'
+                                'expected structure: <scalar>')
+
+
+def test_default_filter():
     template = '''{{ x|default('g') }}'''
     ast = parse(template).find(nodes.Filter)
     rtype, struct = visit_filter(ast, get_context(ast), {}, test_config)
@@ -41,7 +64,7 @@ def test_filter_3():
     assert struct == expected_struct
 
 
-def test_filter_4():
+def test_filter_chaining():
     template = '''{{ (xs|first|last).gsom|sort|length }}'''
     ast = parse(template).find(nodes.Filter)
     rtype, struct = visit_filter(ast, get_context(ast), {}, test_config)
@@ -53,8 +76,6 @@ def test_filter_4():
     })
     assert struct == expected_struct
 
-
-def test_filter_5():
     template = '''{{ x|list|sort|first }}'''
     ast = parse(template).find(nodes.Filter)
     rtype, struct = visit_filter(ast, get_context(ast), {}, test_config)
@@ -64,22 +85,21 @@ def test_filter_5():
     })
     assert struct == expected_struct
 
-
-def test_filter_6():
-    template = '''{{ x|unknownfilter }}'''
-    ast = parse(template).find(nodes.Filter)
-    with pytest.raises(InvalidExpression):
-        visit_filter(ast, get_context(ast), {}, test_config)
-
-
-def test_filter_7():
     template = '''{{ x|first|list }}'''
     ast = parse(template).find(nodes.Filter)
     with pytest.raises(UnexpectedExpression):
         visit_filter(ast, get_context(ast), {}, test_config)
 
 
-def test_filter_8():
+def test_raise_on_unknown_filter():
+    template = '''{{ x|unknownfilter }}'''
+    ast = parse(template).find(nodes.Filter)
+    with pytest.raises(InvalidExpression) as e:
+        visit_filter(ast, get_context(ast), {}, test_config)
+    assert 'unknown filter' in str(e.value)
+
+
+def test_abs_filter():
     ast = parse('{{ x|abs }}').find(nodes.Filter)
     rtype, struct = visit_filter(ast, get_context(ast), {}, test_config)
     assert rtype == Number(label='x', linenos=[1])
@@ -87,13 +107,17 @@ def test_filter_8():
         'x': Number(label='x', linenos=[1])
     })
 
-    ast = parse('{{ x|striptags }}').find(nodes.Filter)
+
+def test_int_filter():
+    ast = parse('{{ x|int }}').find(nodes.Filter)
     rtype, struct = visit_filter(ast, get_context(ast), {}, test_config)
-    assert rtype == String(label='x', linenos=[1])
+    assert rtype == Number(label='x', linenos=[1])
     assert struct == Dictionary({
-        'x': String(label='x', linenos=[1])
+        'x': Scalar(label='x', linenos=[1]),
     })
 
+
+def test_wordcount_filter():
     ast = parse('{{ x|wordcount }}').find(nodes.Filter)
     rtype, struct = visit_filter(ast, get_context(ast), {}, test_config)
     assert rtype == Number(label='x', linenos=[1])
@@ -101,9 +125,12 @@ def test_filter_8():
         'x': String(label='x', linenos=[1])
     })
 
-    ast = parse('{{ xs|join("|") }}').find(nodes.Filter)
+
+def test_join_filter():
+    ast = parse('{{ xs|join(separator|default("|")) }}').find(nodes.Filter)
     rtype, struct = visit_filter(ast, get_context(ast), {}, test_config)
     assert rtype == String(label='xs', linenos=[1])
     assert struct == Dictionary({
-        'xs': List(String(), label='xs', linenos=[1])
+        'xs': List(String(), label='xs', linenos=[1]),
+        'separator': String(label='separator', linenos=[1], used_with_default=True),
     })

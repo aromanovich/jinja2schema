@@ -377,7 +377,7 @@ def test_just_test():
     expected_struct = Dictionary({
         'foo': Unknown(label='foo', linenos=[2]),
         'zork': Unknown(label='zork', linenos=[4]),
-        'sep': Scalar(label='sep', linenos=[5])
+        'sep': String(label='sep', linenos=[5])
     })
     assert struct == expected_struct
 
