@@ -425,7 +425,7 @@ def visit_call(ast, ctx, macroses=None, config=default_config):
             for kwarg in ast.kwargs:
                 arg_rtype, arg_struct = visit_expr(kwarg.value, Context(predicted_struct=Scalar.from_ast(kwarg)), macroses, config=config)
                 struct = merge(struct, arg_struct)
-            return Scalar(), struct
+            return String(), struct
         elif ast.node.name == 'dict':
             ctx.meet(Dictionary(), ast)
             if ast.args:

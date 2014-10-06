@@ -1,13 +1,11 @@
 # coding: utf-8
-import pytest
 from jinja2 import nodes
 
 from jinja2schema.config import Config
 from jinja2schema.core import parse
 from jinja2schema.visitors.expr import (Context, visit_getitem, visit_cond_expr, visit_test,
-                                        visit_getattr, visit_compare, visit_call, visit_const)
-from jinja2schema.exceptions import InvalidExpression
-from jinja2schema.model import Dictionary, Scalar, List, Unknown, String, Number, Boolean, Tuple
+                                        visit_getattr, visit_compare, visit_const)
+from jinja2schema.model import Dictionary, Scalar, List, Unknown, Number, Boolean, Tuple
 
 
 def get_scalar_context(ast):
@@ -220,20 +218,6 @@ def test_test_2():
     assert struct == expected_struct
 
 
-def test_call_dict():
-    template = '''{{ dict(x=\ndict(\na=1, b=2)) }}'''
-    call_ast = parse(template).find(nodes.Call)
-    rtype, struct = visit_call(
-        call_ast, Context(predicted_struct=Unknown.from_ast(call_ast)))
-    expected_rtype = Dictionary({
-        'x': Dictionary({
-            'a': Number(linenos=[3], constant=True),
-            'b': Number(linenos=[3], constant=True)
-        }, linenos=[2], constant=True)
-    }, linenos=[1], constant=True)
-    assert rtype == expected_rtype
-
-
 def test_compare():
     template = '''{{ a < c }}'''
     compare_ast = parse(template).find(nodes.Compare)
@@ -247,21 +231,3 @@ def test_const():
     const_ast = parse(template).find(nodes.Const)
     rtype, struct = visit_const(const_ast, get_scalar_context(const_ast))
     assert rtype == Boolean(constant=True, linenos=[1])
-
-
-def test_call():
-    template = '''{{ x.endswith('_FAST') }}'''
-    call_ast = parse(template).find(nodes.Call)
-    rtype, struct = visit_call(call_ast, get_scalar_context(call_ast))
-    expected_rtype = Boolean()
-    expected_struct = Dictionary({
-        'x': String(label='x', linenos=[1])
-    })
-    assert rtype == expected_rtype
-    assert struct == expected_struct
-
-    template = '''{{ x.some_unknown_f() }}'''
-    call_ast = parse(template).find(nodes.Call)
-    with pytest.raises(InvalidExpression) as e:
-        visit_call(call_ast, get_scalar_context(call_ast))
-    assert str(e.value) == 'line 1: "some_unknown_f" call is not supported'
