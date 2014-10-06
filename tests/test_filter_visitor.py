@@ -9,7 +9,7 @@ from jinja2schema.model import Dictionary, Scalar, List, Unknown, String, Number
 test_config = Config()
 
 
-def get_context(ast):
+def get_scalar_context(ast):
     return Context(return_struct_cls=Scalar, predicted_struct=Scalar.from_ast(ast))
 
 
@@ -56,7 +56,7 @@ def test_batch_and_slice_filters():
 def test_default_filter():
     template = '''{{ x|default('g') }}'''
     ast = parse(template).find(nodes.Filter)
-    rtype, struct = visit_filter(ast, get_context(ast), {}, test_config)
+    rtype, struct = visit_filter(ast, get_scalar_context(ast), {}, test_config)
 
     expected_struct = Dictionary({
         'x': String(label='x', linenos=[1], used_with_default=True),
@@ -67,7 +67,7 @@ def test_default_filter():
 def test_filter_chaining():
     template = '''{{ (xs|first|last).gsom|sort|length }}'''
     ast = parse(template).find(nodes.Filter)
-    rtype, struct = visit_filter(ast, get_context(ast), {}, test_config)
+    rtype, struct = visit_filter(ast, get_scalar_context(ast), {}, test_config)
 
     expected_struct = Dictionary({
         'xs': List(List(Dictionary({
@@ -78,7 +78,7 @@ def test_filter_chaining():
 
     template = '''{{ x|list|sort|first }}'''
     ast = parse(template).find(nodes.Filter)
-    rtype, struct = visit_filter(ast, get_context(ast), {}, test_config)
+    rtype, struct = visit_filter(ast, get_scalar_context(ast), {}, test_config)
 
     expected_struct = Dictionary({
         'x': Scalar(label='x', linenos=[1]),
@@ -88,20 +88,20 @@ def test_filter_chaining():
     template = '''{{ x|first|list }}'''
     ast = parse(template).find(nodes.Filter)
     with pytest.raises(UnexpectedExpression):
-        visit_filter(ast, get_context(ast), {}, test_config)
+        visit_filter(ast, get_scalar_context(ast), {}, test_config)
 
 
 def test_raise_on_unknown_filter():
     template = '''{{ x|unknownfilter }}'''
     ast = parse(template).find(nodes.Filter)
     with pytest.raises(InvalidExpression) as e:
-        visit_filter(ast, get_context(ast), {}, test_config)
+        visit_filter(ast, get_scalar_context(ast), {}, test_config)
     assert 'unknown filter' in str(e.value)
 
 
 def test_abs_filter():
     ast = parse('{{ x|abs }}').find(nodes.Filter)
-    rtype, struct = visit_filter(ast, get_context(ast), {}, test_config)
+    rtype, struct = visit_filter(ast, get_scalar_context(ast), {}, test_config)
     assert rtype == Number(label='x', linenos=[1])
     assert struct == Dictionary({
         'x': Number(label='x', linenos=[1])
@@ -110,7 +110,7 @@ def test_abs_filter():
 
 def test_int_filter():
     ast = parse('{{ x|int }}').find(nodes.Filter)
-    rtype, struct = visit_filter(ast, get_context(ast), {}, test_config)
+    rtype, struct = visit_filter(ast, get_scalar_context(ast), {}, test_config)
     assert rtype == Number(label='x', linenos=[1])
     assert struct == Dictionary({
         'x': Scalar(label='x', linenos=[1]),
@@ -119,7 +119,7 @@ def test_int_filter():
 
 def test_wordcount_filter():
     ast = parse('{{ x|wordcount }}').find(nodes.Filter)
-    rtype, struct = visit_filter(ast, get_context(ast), {}, test_config)
+    rtype, struct = visit_filter(ast, get_scalar_context(ast), {}, test_config)
     assert rtype == Number(label='x', linenos=[1])
     assert struct == Dictionary({
         'x': String(label='x', linenos=[1])
@@ -128,9 +128,18 @@ def test_wordcount_filter():
 
 def test_join_filter():
     ast = parse('{{ xs|join(separator|default("|")) }}').find(nodes.Filter)
-    rtype, struct = visit_filter(ast, get_context(ast), {}, test_config)
+    rtype, struct = visit_filter(ast, get_scalar_context(ast), {}, test_config)
     assert rtype == String(label='xs', linenos=[1])
     assert struct == Dictionary({
         'xs': List(String(), label='xs', linenos=[1]),
         'separator': String(label='separator', linenos=[1], used_with_default=True),
+    })
+
+
+def test_length_filter():
+    ast = parse('{{ xs|length }}').find(nodes.Filter)
+    rtype, struct = visit_filter(ast, get_scalar_context(ast), {}, test_config)
+    assert rtype == Number(label='xs', linenos=[1])
+    assert struct == Dictionary({
+        'xs': List(Unknown(), label='xs', linenos=[1]),
     })

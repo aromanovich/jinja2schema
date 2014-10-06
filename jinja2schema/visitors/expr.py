@@ -513,6 +513,7 @@ def visit_filter(ast, ctx, macroses, config):
             el_struct = ctx.get_predicted_struct()
         elif ast.name == 'length':
             ctx.meet(Scalar(), ast)
+            return_struct_cls = Number
             el_struct = Unknown()
         else:
             ctx.meet(Scalar(), ast)

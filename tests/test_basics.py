@@ -371,7 +371,7 @@ def test_just_test():
     {% set args = ['foo'] if foo else [] %}
     {% set args = args + ['bar'] %}
     {% set args = args + (['zork'] if zork else []) %}
-    f({{args|join(sep)}});
+    f({{ args|join(sep) }});
     '''
     struct = infer(template)
     expected_struct = Dictionary({
