@@ -9,6 +9,7 @@ Statement visitors return :class:`.models.Dictionary` of structures of variables
 import functools
 
 from jinja2 import nodes
+from jinja2schema.config import default_config
 from jinja2schema.util import debug_repr
 
 from ..model import Scalar, Dictionary, List, Unknown, Tuple, Boolean, Macro
@@ -30,14 +31,14 @@ def visits_stmt(node_cls):
     def decorator(func):
         stmt_visitors[node_cls] = func
         @functools.wraps(func)
-        def wrapped_func(ast, macroses, config):
+        def wrapped_func(ast, macroses=None, config=default_config):
             assert isinstance(ast, node_cls)
             return func(ast, macroses, config)
         return wrapped_func
     return decorator
 
 
-def visit_stmt(ast, macroses, config):
+def visit_stmt(ast, macroses=None, config=default_config):
     """Returns a structure of ``ast``.
 
     :param ast: instance of :class:`jinja2.nodes.Stmt`
@@ -54,7 +55,7 @@ def visit_stmt(ast, macroses, config):
 
 
 @visits_stmt(nodes.For)
-def visit_for(ast, macroses, config):
+def visit_for(ast, macroses=None, config=default_config):
     body_struct = visit_many(ast.body, macroses, config, predicted_struct_cls=Scalar)
     else_struct = visit_many(ast.else_, macroses, config, predicted_struct_cls=Scalar)
 
@@ -83,7 +84,7 @@ def visit_for(ast, macroses, config):
 
 
 @visits_stmt(nodes.If)
-def visit_if(ast, macroses, config):
+def visit_if(ast, macroses=None, config=default_config):
     if config.CONSIDER_CONDITIONS_AS_BOOLEAN:
         test_predicted_struct = Boolean.from_ast(ast.test)
     else:
@@ -109,7 +110,7 @@ def visit_if(ast, macroses, config):
 
 
 @visits_stmt(nodes.Assign)
-def visit_assign(ast, macroses, config):
+def visit_assign(ast, macroses=None, config=default_config):
     struct = Dictionary()
     if (isinstance(ast.target, nodes.Name) or
             (isinstance(ast.target, nodes.Tuple) and isinstance(ast.node, nodes.Tuple))):
@@ -145,12 +146,12 @@ def visit_assign(ast, macroses, config):
 
 
 @visits_stmt(nodes.Output)
-def visit_output(ast, macroses, config):
+def visit_output(ast, macroses=None, config=default_config):
     return visit_many(ast.nodes, macroses, config, predicted_struct_cls=Scalar)
 
 
 @visits_stmt(nodes.Macro)
-def visit_macro(ast, macroses, config):
+def visit_macro(ast, macroses=None, config=default_config):
     # XXX the code needs to be refactored
     args = []
     kwargs = []

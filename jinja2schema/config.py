@@ -28,3 +28,6 @@ class Config(object):
     If this variable is not set, ``xs`` variable in template ``{% if xs %}{% endif %}`` will have
     unknown structure. If this variable is set, ``xs`` will be a boolean.
     """
+
+
+default_config = Config()
