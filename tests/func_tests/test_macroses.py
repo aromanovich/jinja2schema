@@ -2,14 +2,10 @@
 import pytest
 from jinja2 import nodes
 
-from jinja2schema.config import Config
 from jinja2schema.core import parse, infer
 from jinja2schema.visitors.stmt import visit_macro
 from jinja2schema.exceptions import MergeException, InvalidExpression
 from jinja2schema.model import Dictionary, Scalar, String, Number, Macro
-
-
-test_config = Config()
 
 
 def test_macro_visitor_1():
@@ -22,7 +18,7 @@ def test_macro_visitor_1():
     ast = parse(template).find(nodes.Macro)
 
     macroses = {}
-    struct = visit_macro(ast, macroses, test_config)
+    struct = visit_macro(ast, macroses)
 
     expected_macro = Macro('input', [
         ('name', Scalar(label='argument #1', linenos=[2])),
@@ -52,7 +48,7 @@ def test_macro_visitor_2():
 
     macroses = {}
     with pytest.raises(MergeException) as e:
-        visit_macro(ast, macroses, test_config)
+        visit_macro(ast, macroses)
 
     assert str(e.value) == ('variable "argument "value"" (used as string on lines 2) conflicts with '
                             'variable "value" (used as dictionary on lines: 3)')
@@ -72,7 +68,7 @@ def test_macro_call_1():
     {{ format_hello(name, 2, m='value', o='value') }}
     {{ format_hello(name, 2, m='value', o='value', dict_arg=d) }}
     '''
-    struct = infer(template, test_config)
+    struct = infer(template)
     assert struct == Dictionary({
         'name': Scalar(label='name', linenos=[2, 11, 12]),
         'd': Dictionary(label='d', linenos=[2, 12]),
@@ -89,7 +85,7 @@ def test_macro_call_2():
     {{ format_hello({}, 2, 'value', 'value') }}
     '''
     with pytest.raises(MergeException) as e:
-        infer(template, test_config)
+        infer(template)
     assert str(e.value) == ('variable "argument #1" (used as scalar on lines 2) conflicts with '
                             'variable "argument #1" (used as dictionary on lines: 7)')
 
@@ -102,7 +98,7 @@ def test_macro_call_2():
     {{ format_hello(a, 2, 'value', {}) }}
     '''
     with pytest.raises(MergeException) as e:
-        infer(template, test_config)
+        infer(template)
     assert str(e.value) == ('variable "argument "o"" (used as string on lines 2) conflicts with '
                             'variable "argument #2" (used as dictionary on lines: 7)')
 
@@ -117,15 +113,15 @@ def test_macro_wrong_args():
 
     template = macro_template + '{{ format_hello() }}'
     with pytest.raises(InvalidExpression) as e:
-        infer(template, test_config)
+        infer(template)
     assert str(e.value) == 'line 6: incorrect usage of "format_hello". it takes exactly 2 positional arguments'
 
     template = macro_template + '{{ format_hello(1, 2, "test", "test", 5) }}'
     with pytest.raises(InvalidExpression) as e:
-        infer(template, test_config)
+        infer(template)
     assert str(e.value) == 'line 6: incorrect usage of "format_hello". it takes exactly 2 positional arguments'
 
     template = macro_template + '{{ format_hello(missing=123) }}'
     with pytest.raises(InvalidExpression) as e:
-        infer(template, test_config)
+        infer(template)
     assert str(e.value) == 'line 6: incorrect usage of "format_hello". unknown argument "missing"'

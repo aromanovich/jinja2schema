@@ -95,6 +95,12 @@ def test_raise_on_unknown_filter():
         visit_filter(ast, get_scalar_context(ast))
     assert 'unknown filter' in str(e.value)
 
+    template = '''{{ x|attr('attr') }}'''
+    ast = parse(template).find(nodes.Filter)
+    with pytest.raises(InvalidExpression) as e:
+        visit_filter(ast, get_scalar_context(ast))
+    assert 'filter is not supported' in str(e.value)
+
 
 def test_abs_filter():
     ast = parse('{{ x|abs }}').find(nodes.Filter)

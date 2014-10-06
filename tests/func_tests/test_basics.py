@@ -295,143 +295,7 @@ def test_basics_12():
     assert struct == expected_struct
 
 
-def test_basics_13():  # test dictsort
-    template = '''
-    {% for k, v in data|dictsort %}
-        {{ k.x }}
-        {{ v }}
-    {% endfor %}
-    '''
-    with pytest.raises(UnexpectedExpression):
-        infer(template)
-
-
-def test_raw_1():
-    template = '''
-    {% raw %}
-        {{ x }}
-    {% endraw %}
-    '''
-    struct = infer(template)
-    expected_struct = Dictionary()
-    assert struct == expected_struct
-
-
-def test_call_range():
-    template = '''
-    {% for number in range(10 - users|length) %}
-        {{ number }}
-    {% endfor %}
-    '''
-    struct = infer(template)
-    expected_struct = Dictionary({
-        'users': List(Unknown(), label='users', linenos=[2]),
-    })
-    assert struct == expected_struct
-
-    template = '''
-    {% for number in range(10 - users|length) %}
-        {{ number.field }}
-    {% endfor %}
-    '''
-    with pytest.raises(MergeException):
-        infer(template)
-
-    template = '{{ range(10 - users|length) }}'
-    with pytest.raises(UnexpectedExpression):
-        infer(template)
-
-
-def test_call_lipsum():
-    template = '''
-    {{ lipsum(n=a.field) }}
-    '''
-    struct = infer(template)
-    expected_struct = Dictionary({
-        'a': Dictionary({
-            'field': Scalar(label='field', linenos=[2]),
-        }, label='a', linenos=[2]),
-    })
-    assert struct == expected_struct
-
-    template = '''
-    {% for number in lipsum(n=10) %}
-    {% endfor %}
-    '''
-    with pytest.raises(UnexpectedExpression):
-        infer(template)
-
-    template = '{{ lipsum(n=10).field }}'
-    with pytest.raises(UnexpectedExpression):
-        infer(template)
-
-
-def test_just_test():
-    template = '''
-    {% set args = ['foo'] if foo else [] %}
-    {% set args = args + ['bar'] %}
-    {% set args = args + (['zork'] if zork else []) %}
-    f({{ args|join(sep) }});
-    '''
-    struct = infer(template)
-    expected_struct = Dictionary({
-        'foo': Unknown(label='foo', linenos=[2]),
-        'zork': Unknown(label='zork', linenos=[4]),
-        'sep': String(label='sep', linenos=[5])
-    })
-    assert struct == expected_struct
-
-
-def test_allow_only_boolean_in_test_setting_1():
-    template = '''
-    {% if x %}
-        Hello!
-    {% endif %}
-    {{ 'Hello!' if y else '' }}
-    '''
-    config_1 = Config()
-    struct = infer(template, config_1)
-    expected_struct = Dictionary({
-        'x': Unknown(label='x', linenos=[2]),
-        'y': Unknown(label='y', linenos=[5]),
-    })
-    assert struct == expected_struct
-
-    infer('{% if [] %}{% endif %}', config_1)  # make sure it doesn't raise
-
-    config_2 = Config()
-    config_2.CONSIDER_CONDITIONS_AS_BOOLEAN = True
-    struct = infer(template, config_2)
-    expected_struct = Dictionary({
-        'x': Boolean(label='x', linenos=[2]),
-        'y': Boolean(label='y', linenos=[5]),
-    })
-    assert struct == expected_struct
-
-    with pytest.raises(UnexpectedExpression) as e:
-        infer('{% if [] %}{% endif %}', config_2)  # make sure this does raise
-    assert str(e.value) == ('conflict on the line 1\n'
-                            'got: AST node jinja2.nodes.List of structure [<unknown>]\n'
-                            'expected structure: <boolean>')
-
-
-def test_allow_only_boolean_in_test_setting_2():
-    config = Config()
-    config.CONSIDER_CONDITIONS_AS_BOOLEAN = True
-
-    template = '''
-    {% if x == 'test' %}
-        Hello!
-    {% endif %}
-    '''
-    struct = infer(template, config)
-    expected_struct = Dictionary({
-        'x': Unknown(label='x', linenos=[2]),
-    })
-    assert struct == expected_struct
-
-
-def test_basics_100():
+def test_basics_13():
     config = Config()
     config.TYPE_OF_VARIABLE_INDEXED_WITH_INTEGER_TYPE = 'tuple'
 
@@ -444,16 +308,16 @@ def test_basics_100():
     struct = infer(template, config)
     expected_struct = Dictionary({
         'xs': List(Tuple((
-             Unknown(label=None, linenos=[]),
-             Unknown(label=None, linenos=[]),
-             Scalar(label=None, linenos=[3]),
-             Scalar(label=None, linenos=[4]),
+            Unknown(label=None, linenos=[]),
+            Unknown(label=None, linenos=[]),
+            Scalar(label=None, linenos=[3]),
+            Scalar(label=None, linenos=[4]),
         ), label='x', linenos=[3, 4]), label='xs', linenos=[2])
     })
     assert struct == expected_struct
 
 
-def test_basics_101():
+def test_basics_14():
     template = '''
     {{ section.FILTERS.test }}
     {%- for f in section.FILTERS.keys() %}
@@ -473,7 +337,7 @@ def test_basics_101():
     assert struct == expected_struct
 
 
-def test_basics_102():
+def test_basics_15():
     template = '''
     {%- if x is undefined %}
         {{ test }}
@@ -501,7 +365,7 @@ def test_basics_102():
     assert struct == expected_struct
 
 
-def test_basics_103():
+def test_basics_16():
     config = Config()
     config.CONSIDER_CONDITIONS_AS_BOOLEAN = True
     template = '''
@@ -522,7 +386,7 @@ def test_basics_103():
     assert struct == expected_struct
 
 
-def test_basics_104():
+def test_basics_17():
     template = '''{{ 'x and y' if x and y is defined else ':(' }}'''
     config = Config()
     config.CONSIDER_CONDITIONS_AS_BOOLEAN = True
@@ -596,3 +460,137 @@ def test_basics_104():
         'queue': Scalar(label='queue', linenos=[2, 3], checked_as_defined=True)
     })
     assert struct == expected_struct
+
+
+def test_raw():
+    template = '''
+    {% raw %}
+        {{ x }}
+    {% endraw %}
+    '''
+    struct = infer(template)
+    expected_struct = Dictionary()
+    assert struct == expected_struct
+
+
+def test_for():
+    template = '''
+    {% for number in range(10 - users|length) %}
+        {{ number }}
+    {% endfor %}
+    '''
+    struct = infer(template)
+    expected_struct = Dictionary({
+        'users': List(Unknown(), label='users', linenos=[2]),
+    })
+    assert struct == expected_struct
+
+    template = '''
+    {% for number in range(10 - users|length) %}
+        {{ number.field }}
+    {% endfor %}
+    '''
+    with pytest.raises(MergeException):
+        infer(template)
+
+    template = '{{ range(10 - users|length) }}'
+    with pytest.raises(UnexpectedExpression):
+        infer(template)
+
+
+    template = '''
+    {{ lipsum(n=a.field) }}
+    '''
+    struct = infer(template)
+    expected_struct = Dictionary({
+        'a': Dictionary({
+            'field': Scalar(label='field', linenos=[2]),
+        }, label='a', linenos=[2]),
+    })
+    assert struct == expected_struct
+
+    template = '''
+    {% for number in lipsum(n=10) %}
+    {% endfor %}
+    '''
+    with pytest.raises(UnexpectedExpression):
+        infer(template)
+
+    template = '{{ lipsum(n=10).field }}'
+    with pytest.raises(UnexpectedExpression):
+        infer(template)
+
+    template = '''
+    {% for k, v in data|dictsort %}
+        {{ k.x }}
+        {{ v }}
+    {% endfor %}
+    '''
+    with pytest.raises(UnexpectedExpression):
+        infer(template)
+
+
+def test_assignment():
+    template = '''
+    {% set args = ['foo'] if foo else [] %}
+    {% set args = args + ['bar'] %}
+    {% set args = args + (['zork'] if zork else []) %}
+    f({{ args|join(sep) }});
+    '''
+    struct = infer(template)
+    expected_struct = Dictionary({
+        'foo': Unknown(label='foo', linenos=[2]),
+        'zork': Unknown(label='zork', linenos=[4]),
+        'sep': String(label='sep', linenos=[5])
+    })
+    assert struct == expected_struct
+
+
+def test_consider_contitions_as_boolean_setting_1():
+    template = '''
+    {% if x %}
+        Hello!
+    {% endif %}
+    {{ 'Hello!' if y else '' }}
+    '''
+    config_1 = Config()
+    struct = infer(template, config_1)
+    expected_struct = Dictionary({
+        'x': Unknown(label='x', linenos=[2]),
+        'y': Unknown(label='y', linenos=[5]),
+    })
+    assert struct == expected_struct
+
+    infer('{% if [] %}{% endif %}', config_1)  # make sure it doesn't raise
+
+    config_2 = Config()
+    config_2.CONSIDER_CONDITIONS_AS_BOOLEAN = True
+    struct = infer(template, config_2)
+    expected_struct = Dictionary({
+        'x': Boolean(label='x', linenos=[2]),
+        'y': Boolean(label='y', linenos=[5]),
+    })
+    assert struct == expected_struct
+
+    with pytest.raises(UnexpectedExpression) as e:
+        infer('{% if [] %}{% endif %}', config_2)  # make sure this does raise
+    assert str(e.value) == ('conflict on the line 1\n'
+                            'got: AST node jinja2.nodes.List of structure [<unknown>]\n'
+                            'expected structure: <boolean>')
+
+
+def test_consider_contitions_as_boolean_setting_2():
+    config = Config()
+    config.CONSIDER_CONDITIONS_AS_BOOLEAN = True
+
+    template = '''
+    {% if x == 'test' %}
+        Hello!
+    {% endif %}
+    '''
+    struct = infer(template, config)
+    expected_struct = Dictionary({
+        'x': Unknown(label='x', linenos=[2]),
+    })
+    assert struct == expected_struct
+

@@ -1,5 +1,7 @@
 # coding: utf-8
 from jinja2 import nodes
+import pytest
+from jinja2schema import InvalidExpression
 
 from jinja2schema.config import Config
 from jinja2schema.core import parse
@@ -216,6 +218,12 @@ def test_test_2():
         'x': Unknown(label='x', linenos=[1])
     })
     assert struct == expected_struct
+
+    template = '{{ x is unknown_filter }}'
+    ast = parse(template).find(nodes.Test)
+    with pytest.raises(InvalidExpression) as e:
+        visit_test(ast, get_scalar_context(ast))
+    assert 'line 1: unknown test "unknown_filter"' in str(e.value)
 
 
 def test_compare():
