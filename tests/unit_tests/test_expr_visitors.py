@@ -29,7 +29,7 @@ def test_cond_expr():
     rtype, struct = visit_cond_expr(ast, get_scalar_context(ast))
 
     expected_struct = Dictionary({
-        'queue': Scalar(label='queue', linenos=[1], checked_as_undefined=True)
+        'queue': Scalar(label='queue', linenos=[1])
     })
     assert struct == expected_struct
 

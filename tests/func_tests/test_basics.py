@@ -360,7 +360,7 @@ def test_basics_15():
         'x': Unknown(label='x', checked_as_undefined=True, linenos=[2]),
         'test': Scalar(label='test', linenos=[3]),
         'y': Number(label='y', may_be_defined=True, linenos=[6, 7, 10, 11]),
-        'z': Scalar(label='z', checked_as_undefined=True, linenos=[14, 15]),
+        'z': Scalar(label='z', linenos=[14, 15]),
     })
     assert struct == expected_struct
 
@@ -448,6 +448,18 @@ def test_basics_17():
     struct = infer(template, config)
     expected_struct = Dictionary({
         'x': Scalar(label='x', linenos=[2, 5]),
+    })
+    assert struct == expected_struct
+
+    template = '''
+    {% if x is defined %}
+    {% else %}
+        {{ x }}
+    {% endif %}
+    '''
+    struct = infer(template, config)
+    expected_struct = Dictionary({
+        'x': Scalar(label='x', linenos=[2, 4]),
     })
     assert struct == expected_struct
 

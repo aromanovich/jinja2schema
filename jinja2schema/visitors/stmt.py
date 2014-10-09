@@ -104,8 +104,12 @@ def visit_if(ast, macroses=None, config=default_config):
             struct[var_name].may_be_defined = (lookup_struct and
                                                var_name in lookup_struct and
                                                lookup_struct[var_name].constant)
-        struct[var_name].checked_as_defined = test_struct[var_name].checked_as_defined
-        struct[var_name].checked_as_undefined = test_struct[var_name].checked_as_undefined
+            struct[var_name].checked_as_defined = test_struct[var_name].checked_as_defined and (
+                not lookup_struct or not var_name in lookup_struct or lookup_struct[var_name].constant
+            )
+            struct[var_name].checked_as_undefined = test_struct[var_name].checked_as_undefined and (
+                not lookup_struct or not var_name in lookup_struct or lookup_struct[var_name].constant
+            )
     return struct
 
 
