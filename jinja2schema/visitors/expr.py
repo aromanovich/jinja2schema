@@ -320,7 +320,7 @@ def visit_cond_expr(ast, ctx, macroses=None, config=default_config):
                 lookup_struct = else_struct
             struct[var_name].may_be_defined = (lookup_struct and
                                                var_name in lookup_struct and
-                                               lookup_struct[var_name].assigned)
+                                               lookup_struct[var_name].constant)
         struct[var_name].checked_as_defined = test_struct[var_name].checked_as_defined
         struct[var_name].checked_as_undefined = test_struct[var_name].checked_as_undefined
 

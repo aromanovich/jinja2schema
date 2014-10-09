@@ -68,7 +68,6 @@ def merge(fst, snd, custom_merger=None):
     result.linenos = list(sorted(set(fst.linenos + snd.linenos)))
     result.constant = fst.constant
     result.may_be_defined = fst.may_be_defined
-    result.assigned = fst.assigned
     result.used_with_default = fst.used_with_default and snd.used_with_default
     result.checked_as_defined = fst.checked_as_defined and snd.checked_as_defined
     result.checked_as_undefined = fst.checked_as_undefined and snd.checked_as_undefined

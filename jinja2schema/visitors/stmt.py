@@ -103,7 +103,7 @@ def visit_if(ast, macroses=None, config=default_config):
                 lookup_struct = else_struct
             struct[var_name].may_be_defined = (lookup_struct and
                                                var_name in lookup_struct and
-                                               lookup_struct[var_name].assigned)
+                                               lookup_struct[var_name].constant)
         struct[var_name].checked_as_defined = test_struct[var_name].checked_as_defined
         struct[var_name].checked_as_undefined = test_struct[var_name].checked_as_undefined
     return struct
@@ -126,7 +126,6 @@ def visit_assign(ast, macroses=None, config=default_config):
         for var_name, var_ast in variables:
             var_rtype, var_struct = visit_expr(var_ast, Context(predicted_struct=Unknown.from_ast(var_ast)), macroses, config)
             var_rtype.constant = True
-            var_rtype.assigned = True
             var_rtype.label = var_name
             struct = merge_many(struct, var_struct, Dictionary({
                 var_name: var_rtype,

@@ -23,26 +23,37 @@ class Variable(object):
 
     .. attribute:: constant
 
-        Is true if the variable is defined using a ``{% set %}`` tag before used in the template.
+        Is true if the variable is defined using a ``{% set %}`` tag before it
+        occurs within any other statement in the template, or inferred from
+        a constant Jinja2 node.
 
     .. attribute:: may_be_defined
 
-        Is true if the variable would be defined (using a ``{% set %}`` expression) if it is missing
+        Is true if the variable would be defined (using a ``{% set %}`` expression) if it's missing
         from the template context. For example, ``x`` is ``may_be_defined`` in the following template::
 
             {% if x is undefined %} {% set x = 1 %} {% endif %}
 
     .. attribute:: used_with_default
 
-        Is true if the variable occurs **only** within the ``default`` filter.
+        Is true if the variable occurs only within the ``default`` filter.
+
+    .. attribute:: checked_as_undefined
+
+        Is true if the variable occurs within {% if %} block which condition checks
+        if the variable is undefined.
+
+    .. attribute:: checked_as_defined
+
+        Is true if the variable occurs within {% if %} block which condition checks
+        if the variable is defined.
     """
-    def __init__(self, label=None, linenos=None, constant=False, assigned=False,
+    def __init__(self, label=None, linenos=None, constant=False,
                  may_be_defined=False, used_with_default=False,
                  checked_as_undefined=False, checked_as_defined=False):
         self.label = label
         self.linenos = linenos if linenos is not None else []
         self.constant = constant
-        self.assigned = assigned
         self.may_be_defined = may_be_defined
         self.used_with_default = used_with_default
         self.checked_as_undefined = checked_as_undefined
@@ -54,19 +65,14 @@ class Variable(object):
 
     @classmethod
     def _get_kwargs_from_ast(cls, ast):
-        if isinstance(ast, nodes.Name):
-            label = ast.name
-        else:
-            label = None
-        rv = {
+        return {
             'linenos': [ast.lineno],
-            'label': label,
+            'label': ast.name if isinstance(ast, nodes.Name) else None,
         }
-        return rv
 
     @classmethod
     def from_ast(cls, ast, **kwargs):
-        """Constructs a variable extracting information from ``ast`` (such as label and line numbers).
+        """Constructs a variable using information from ``ast`` (such as label and line numbers).
 
         :param ast: AST node
         :type ast: :class:`jinja2.nodes.Node`
@@ -79,21 +85,19 @@ class Variable(object):
 
     @property
     def required(self):
-        return (not self.may_be_defined and
-                not self.used_with_default and
-                not self.checked_as_defined and
-                not self.checked_as_undefined)
+        return not any([self.may_be_defined, self.used_with_default,
+                        self.checked_as_defined, self.checked_as_undefined])
 
     def __eq__(self, other):
         return (
             type(self) is type(other) and
-            self.constant == other.constant and
-            self.used_with_default == other.used_with_default and
-            self.required == other.required and
             self.linenos == other.linenos and
             self.label == other.label and
+            self.constant == other.constant and
+            self.used_with_default == other.used_with_default and
             self.checked_as_undefined == other.checked_as_undefined and
-            self.checked_as_defined == other.checked_as_defined
+            self.checked_as_defined == other.checked_as_defined and
+            self.required == other.required
         )
 
     def __ne__(self, other):
@@ -217,6 +221,10 @@ class Tuple(Variable):
     .. attribute:: items
 
         A :class:`tuple` of :class:`Variable` instances or ``None`` if the tuple items are unknown.
+
+    .. attribute:: items
+
+        Whether new elements can be added to the tuple in the process of merge or not.
     """
     def __init__(self, items, **kwargs):
         self.items = tuple(items) if items is not None else None
@@ -271,6 +279,23 @@ class Unknown(Variable):
 
 
 class Macro(object):
+    """A macro.
+
+    .. attribute:: name
+
+        Name.
+
+    .. attribute:: args
+
+        Positional arguments. A list of 2-tuples whose first element is string that
+        contains argument name and second is a :class:`Variable` -- a structure which
+        expected of that argument.
+        Arguments must be in the same order as they are listed in macro signature.
+
+    .. attribute:: kwargs
+
+        The same as :attr:`args`, but keyword arguments.
+    """
     def __init__(self, name, args, kwargs):
         self.name = name
         self.args = args
