@@ -126,6 +126,22 @@ class JSONSchemaDraft4Encoder(object):
         return rv
 
 
+class StringJSONSchemaEncoder(JSONSchemaDraft4Encoder):
+    """Encodes :class:`Unknown` and :class:`Scalar` (but not scalar subclasses --
+    string, number or boolean) variables as strings.
+
+    Useful for rendering forms using resulting JSON schema, as most of form-rendering
+    tools do not support "anyOf" validator.
+    """
+    def encode(self, var):
+        if isinstance(var, Unknown) or type(var) is Scalar:
+            rv = self.encode_common_attrs(var)
+            rv['type'] = 'string'
+        else:
+            rv = super(StringJSONSchemaEncoder, self).encode(var)
+        return rv
+
+
 def to_json_schema(var, jsonschema_encoder=JSONSchemaDraft4Encoder):
     """
     :param var: a variable
