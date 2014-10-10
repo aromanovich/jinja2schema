@@ -5,7 +5,7 @@ from jinja2 import nodes
 from jinja2schema.core import parse, infer
 from jinja2schema.visitors.stmt import visit_macro
 from jinja2schema.exceptions import MergeException, InvalidExpression, UnexpectedExpression
-from jinja2schema.model import Dictionary, Scalar, String, Number, Macro
+from jinja2schema.model import Dictionary, Scalar, String, Number, Macro, Boolean
 
 
 def test_macro_visitor_1():
@@ -77,14 +77,15 @@ def test_macro_call_1():
 
 def test_macro_call_2():
     template = '''
-    {% macro user(login, name) %}
-        {{ login }} {{ name.first }} {{ name.last }}
+    {% macro user(login, name, is_active=True) %}
+        {{ login }} {{ name.first }} {{ name.last }} {{ is_active }}
     {% endmacro %}
-    {{ user(data.login, data.name) }}
+    {{ user(data.login, data.name, is_active=data.is_active) }}
     '''
     struct = infer(template)
     assert struct['data'] == Dictionary({
         'login': Scalar(label='login', linenos=[2, 5]),
+        'is_active': Boolean(label='is_active', linenos=[2, 5]),
         'name': Dictionary({
             'first': Scalar(label='first', linenos=[3]),
             'last': Scalar(label='last', linenos=[3]),

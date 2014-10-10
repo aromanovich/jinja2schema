@@ -354,23 +354,21 @@ def check_macro_call(ast, macro, args, kwargs, config):
     if args:
         args, expected_kwargs, rv = match_args(rv, args, expected_kwargs)
 
-    def match_kwarg(kwarg_name, kwarg_ast, kwarg, expected_kwargs):
+    def match_kwarg(rv, kwarg_name, kwarg_ast, kwarg, expected_kwargs):
         r = []
         found = False
         for (expected_kwarg_name, expected_kwarg) in expected_kwargs:
             if kwarg_name == expected_kwarg_name:
-                kwarg_struct = merge(expected_kwarg, kwarg)  # to make sure
-                if kwarg.label:
-                    kwarg_struct.label = kwarg.label
-                    rv[kwarg.label] = kwarg_struct
+                _, s = visit_expr(kwarg_ast.value, Context(predicted_struct=expected_kwarg), {}, config)
+                rv = merge(rv, s)
                 found = True
             else:
                 r.append((expected_kwarg_name, expected_kwarg))
-        return r, found
+        return rv, r, found
 
     for kwarg, (kwarg_ast, kwarg_type) in _compat.iteritems(kwargs):
-        expected_args, found_1 = match_kwarg(kwarg, kwarg_ast, kwarg_type, expected_args)
-        expected_kwargs, found_2 = match_kwarg(kwarg, kwarg_ast, kwarg_type, expected_kwargs)
+        rv, expected_args, found_1 = match_kwarg(rv, kwarg, kwarg_ast, kwarg_type, expected_args)
+        rv, expected_kwargs, found_2 = match_kwarg(rv, kwarg, kwarg_ast, kwarg_type, expected_kwargs)
         if not (found_1 or found_2):
             raise InvalidExpression(ast, 'incorrect usage of "{0}". unknown argument "{1}"'.format(macro.name, kwarg))
 
