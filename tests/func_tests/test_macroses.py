@@ -4,7 +4,7 @@ from jinja2 import nodes
 
 from jinja2schema.core import parse, infer
 from jinja2schema.visitors.stmt import visit_macro
-from jinja2schema.exceptions import MergeException, InvalidExpression
+from jinja2schema.exceptions import MergeException, InvalidExpression, UnexpectedExpression
 from jinja2schema.model import Dictionary, Scalar, String, Number, Macro
 
 
@@ -77,6 +77,23 @@ def test_macro_call_1():
 
 def test_macro_call_2():
     template = '''
+    {% macro user(login, name) %}
+        {{ login }} {{ name.first }} {{ name.last }}
+    {% endmacro %}
+    {{ user(data.login, data.name) }}
+    '''
+    struct = infer(template)
+    assert struct['data'] == Dictionary({
+        'login': Scalar(label='login', linenos=[2, 5]),
+        'name': Dictionary({
+            'first': Scalar(label='first', linenos=[3]),
+            'last': Scalar(label='last', linenos=[3]),
+        }, label='name', linenos=[2, 5]),
+    }, label='data', linenos=[5])
+
+
+def test_macro_call_3():
+    template = '''
     {% macro format_hello(name, n, m='test', o='test') -%}
         Hello, {{ name }}!
         {{ n }}
@@ -84,10 +101,12 @@ def test_macro_call_2():
 
     {{ format_hello({}, 2, 'value', 'value') }}
     '''
-    with pytest.raises(MergeException) as e:
+    with pytest.raises(UnexpectedExpression) as e:
         infer(template)
-    assert str(e.value) == ('variable "argument #1" (used as scalar on lines 2) conflicts with '
-                            'variable "argument #1" (used as dictionary on lines: 7)')
+    # TODO it should be clear which argument caused conflict
+    assert str(e.value) == ('conflict on the line 7\n'
+                            'got: AST node jinja2.nodes.Dict of structure {}\n'
+                            'expected structure: <scalar>')
 
     template = '''
     {% macro format_hello(name, n, m='test', o='test') -%}
@@ -97,10 +116,12 @@ def test_macro_call_2():
 
     {{ format_hello(a, 2, 'value', {}) }}
     '''
-    with pytest.raises(MergeException) as e:
+    with pytest.raises(UnexpectedExpression) as e:
         infer(template)
-    assert str(e.value) == ('variable "argument "o"" (used as string on lines 2) conflicts with '
-                            'variable "argument #2" (used as dictionary on lines: 7)')
+    # TODO it should be clear which argument caused conflict
+    assert str(e.value) == ('conflict on the line 7\n'
+                            'got: AST node jinja2.nodes.Dict of structure {}\n'
+                            'expected structure: <string>')
 
 
 def test_macro_wrong_args():
