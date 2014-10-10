@@ -4,13 +4,13 @@ jinja2schema
 .. image:: https://travis-ci.org/aromanovich/jinja2schema.svg?branch=master
    :target: https://travis-ci.org/aromanovich/jinja2schema
 
-Documentation_ | GitHub_ |  PyPI_
+Demo_ | Documentation_ | GitHub_ |  PyPI_
 
-A library for inferring types from `Jinja2`_ templates.
+A library providing heuristic type inference algorithm for `Jinja2`_ templates.
 
 .. code-block:: python
 
-    >>> from jinja2schema import infer
+    >>> from jinja2schema import infer, to_json_schema
     >>> s = infer('{{ (x.a.b|first).name }}')
     >>> s
     {'x': {'a': {'b': [{'name': <scalar>}]}}
@@ -19,10 +19,11 @@ A library for inferring types from `Jinja2`_ templates.
     ... {% for x in xs %}
     ...   {{ x }}
     ... {% endfor %}
+    ...
     ''')
     >>> s
     {'xs': [<scalar>]}
-    >>> s.to_json_schema()
+    >>> to_json_schema(s)
     {
         'type': 'object',
         'required': ['xs'],
@@ -56,6 +57,7 @@ License
 `BSD license`_
 
 .. _Jinja2: http://jinja.pocoo.org/docs/
+.. _Demo: http://jinja2schema.aromanovich.ru/
 .. _Documentation: http://jinja2schema.rtfd.org/
 .. _GitHub: https://github.com/aromanovich/jinja2schema
 .. _PyPI: https://pypi.python.org/pypi/jinja2schema

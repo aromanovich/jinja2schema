@@ -9,11 +9,12 @@ Introduction
 jinja2schema is a library for inferring types from `Jinja2`_ templates.
 
 One of the possible usages of jinja2schema is to create a JSON schema of a context expected by the template
-and then use it to render a form (using such JS libraries as `Alpaca`_ or `JSON Editor`_) or to validate
-user input.
+and then use it to render an HTML form (using such JS libraries as `angular-schema-form`_,
+`Alpaca`_ or `JSON Editor`_) or to validate a user input.
 
 The library is in an early stage of development. Although the code is extensively tested,
-please be prepared for bugs and if you find some, let the author know by `opening a ticket`_.
+please be prepared for bugs or inconsistencies and if you find some,
+let the author know by `opening a ticket`_.
 
 Examples
 --------
@@ -104,13 +105,14 @@ To get a more detailed representation of a structure, one could use :func:`jinja
 .. _opening a ticket: https://github.com/aromanovich/jinja2schema/issues
 .. _Jinja2: http://jinja.pocoo.org/docs/
 .. _Alpaca: http://www.alpacajs.org/
+.. _angular-schema-form: https://github.com/Textalk/angular-schema-form
 .. _JSON Editor: https://github.com/jdorn/json-editor
 .. _JSON schema: http://json-schema.org/
 
 How It Works
 ------------
 
-jinja2schema logic based on the following common sense assumptions.
+jinja2schema algorithm based on the following common sense assumptions.
 
 .. note::
 
@@ -159,7 +161,7 @@ To infer types from a template, simply call :func:`jinja2schema.infer`.
 .. autofunction:: jinja2schema.infer
 
 It will return a :class:`.model.Variable` instance, which can be converted to
-JSON schema using it's :meth:`.model.Variable.to_json_schema` method.
+JSON schema using :meth:`to_json_schema` method.
 
 :func:`infer` logic can be tuned by specifying a custom :class:`jinja2schema.config.Config`.
 
@@ -181,7 +183,6 @@ The project is hosted on GitHub_.
 Please feel free to send a pull request or open an issue.
 
 .. _GitHub: https://github.com/aromanovich/jinja2schema
-
 
 Running the Tests
 ~~~~~~~~~~~~~~~~~
