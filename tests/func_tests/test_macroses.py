@@ -4,7 +4,7 @@ from jinja2 import nodes
 
 from jinja2schema.core import parse, infer
 from jinja2schema.visitors.stmt import visit_macro
-from jinja2schema.exceptions import MergeException, InvalidExpression, UnexpectedExpression
+from jinja2schema.exceptions import MergeException, InvalidExpression
 from jinja2schema.model import Dictionary, Scalar, String, Number, Boolean
 from jinja2schema.macro import Macro
 

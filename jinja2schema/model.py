@@ -103,17 +103,6 @@ class Variable(object):
     def __ne__(self, other):
         return not self.__eq__(other)
 
-    def to_json_schema(self):
-        """Returns JSON schema of the variable.
-
-        .. deprecated:: 0.0.6
-           Use :func:`jinja2schema.core.to_json_schema` instead.
-
-        :rtype: :class:`dict`
-        """
-        from .core import to_json_schema
-        return to_json_schema(self)
-
 
 class Dictionary(Variable):
     """A dictionary.
