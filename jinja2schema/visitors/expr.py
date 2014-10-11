@@ -302,7 +302,7 @@ def visit_concat(ast, ctx, macroses=None, config=default_config):
 
 @visits_expr(nodes.CondExpr)
 def visit_cond_expr(ast, ctx, macroses=None, config=default_config):
-    if config.CONSIDER_CONDITIONS_AS_BOOLEAN:
+    if config.BOOLEAN_CONDITIONS:
         test_predicted_struct = Boolean.from_ast(ast.test)
     else:
         test_predicted_struct = Unknown.from_ast(ast.test)

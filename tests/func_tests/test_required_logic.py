@@ -72,8 +72,7 @@ def test_2():
 
 
 def test_3():
-    config = Config()
-    config.CONSIDER_CONDITIONS_AS_BOOLEAN = True
+    config = Config(BOOLEAN_CONDITIONS=True)
     template = '''
     {%- if new_configuration is undefined %}
       {%- if production is defined and production %}
@@ -94,8 +93,7 @@ def test_3():
 
 def test_4():
     template = '''{{ 'x and y' if x and y is defined else ':(' }}'''
-    config = Config()
-    config.CONSIDER_CONDITIONS_AS_BOOLEAN = True
+    config = Config(BOOLEAN_CONDITIONS=True)
     struct = infer(template, config)
     expected_struct = Dictionary({
         'x': Boolean(label='x', linenos=[1]),

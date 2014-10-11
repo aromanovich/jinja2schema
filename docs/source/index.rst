@@ -161,9 +161,10 @@ jinja2schema algorithm based on the following common sense assumptions.
     will be customizable at some point in the future.
 
 * If ``x`` is printed (``{{ x }}``), ``x`` is a scalar: a string, a number or a boolean;
-* If ``x`` is used as an iterable in for loop (``{% for item in x %}``), used with
-  a list filter (i.e., ``x|first``), or being indexed with a number (``x[0]``),
-  ``x`` is a list;
+* If ``x`` is used as an iterable in for loop (``{% for item in x %}``) or used with
+  a list filter (i.e., ``x|first``), ``x`` is a list. If ``x`` is being indexed with an integer
+  (``x[0]``) ``x`` is a list, dictionary or tuple (that behaviour can be adjusted using
+  :attr:`jinja2schema.config.Config.TYPE_OF_VARIABLE_INDEXED_WITH_INTEGER_TYPE`);
 * If ``x`` is used with a dot (``x.field``) or being indexed with a string (``x['field']``),
   ``x`` is a dictionary.
 * A variable can only be used in the one role. So that a list or dictionary can not be printed,

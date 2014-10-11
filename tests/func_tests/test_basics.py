@@ -367,7 +367,7 @@ def test_assignment():
     assert struct == expected_struct
 
 
-def test_consider_contitions_as_boolean_setting_1():
+def test_boolean_conditions_setting_1():
     template = '''
     {% if x %}
         Hello!
@@ -384,8 +384,7 @@ def test_consider_contitions_as_boolean_setting_1():
 
     infer('{% if [] %}{% endif %}', config_1)  # make sure it doesn't raise
 
-    config_2 = Config()
-    config_2.CONSIDER_CONDITIONS_AS_BOOLEAN = True
+    config_2 = Config(BOOLEAN_CONDITIONS=True)
     struct = infer(template, config_2)
     expected_struct = Dictionary({
         'x': Boolean(label='x', linenos=[2]),
@@ -400,9 +399,8 @@ def test_consider_contitions_as_boolean_setting_1():
                             'expected structure: <boolean>')
 
 
-def test_consider_contitions_as_boolean_setting_2():
-    config = Config()
-    config.CONSIDER_CONDITIONS_AS_BOOLEAN = True
+def test_boolean_conditions_setting_2():
+    config = Config(BOOLEAN_CONDITIONS=True)
 
     template = '''
     {% if x == 'test' %}

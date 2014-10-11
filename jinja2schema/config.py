@@ -3,6 +3,8 @@
 jinja2schema.config
 ~~~~~~~~~~~~~~~~~~~
 """
+
+
 class Config(object):
     """Configuration."""
 
@@ -22,12 +24,26 @@ class Config(object):
     being indexed with an integer.
     """
 
-    CONSIDER_CONDITIONS_AS_BOOLEAN = False
+    BOOLEAN_CONDITIONS = False
     """Whether or not to consider conditions in ``if`` statements as boolean.
 
     If this variable is not set, ``xs`` variable in template ``{% if xs %}{% endif %}`` will have
     unknown structure. If this variable is set, ``xs`` will be a boolean.
     """
+
+    def __init__(self,
+                 TYPE_OF_VARIABLE_INDEXED_WITH_VARIABLE_TYPE='dictionary',
+                 TYPE_OF_VARIABLE_INDEXED_WITH_INTEGER_TYPE='list',
+                 BOOLEAN_CONDITIONS=False):
+        if TYPE_OF_VARIABLE_INDEXED_WITH_VARIABLE_TYPE not in ('dictionary', 'list'):
+            raise ValueError('TYPE_OF_VARIABLE_INDEXED_WITH_VARIABLE_TYPE must be'
+                             'either "dictionary" or "list"')
+        if TYPE_OF_VARIABLE_INDEXED_WITH_INTEGER_TYPE not in ('dictionary', 'list', 'tuple'):
+            raise ValueError('TYPE_OF_VARIABLE_INDEXED_WITH_VARIABLE_TYPE must be'
+                             'either "dictionary", "tuple" or "list"')
+        self.TYPE_OF_VARIABLE_INDEXED_WITH_INTEGER_TYPE = TYPE_OF_VARIABLE_INDEXED_WITH_INTEGER_TYPE
+        self.TYPE_OF_VARIABLE_INDEXED_WITH_VARIABLE_TYPE = TYPE_OF_VARIABLE_INDEXED_WITH_VARIABLE_TYPE
+        self.BOOLEAN_CONDITIONS = BOOLEAN_CONDITIONS
 
 
 default_config = Config()

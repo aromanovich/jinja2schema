@@ -40,12 +40,12 @@ class Variable(object):
 
     .. attribute:: checked_as_undefined
 
-        Is true if the variable occurs within {% if %} block which condition checks
+        Is true if the variable occurs within ``{% if %}`` block which condition checks
         if the variable is undefined.
 
     .. attribute:: checked_as_defined
 
-        Is true if the variable occurs within {% if %} block which condition checks
+        Is true if the variable occurs within ``{% if %}`` block which condition checks
         if the variable is defined.
     """
     def __init__(self, label=None, linenos=None, constant=False,

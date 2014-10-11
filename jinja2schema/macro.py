@@ -1,7 +1,12 @@
-from jinja2schema import _compat
-from jinja2schema.config import default_config
-from jinja2schema.mergers import merge
-from jinja2schema.model import Unknown, Dictionary
+# coding: utf-8
+"""
+jinja2schema.macro
+~~~~~~~~~~~~~~~~~~
+"""
+from . import _compat
+from .config import default_config
+from .mergers import merge
+from .model import Unknown, Dictionary
 
 
 class Macro(object):
@@ -68,7 +73,9 @@ class MacroCall(object):
         for kwarg_name, (kwarg_ast, kwarg_type) in list(_compat.iteritems(self.passed_kwargs)):
             for (expected_arg_name, expected_arg_struct) in list(to_args):
                 if kwarg_name == expected_arg_name:
-                    _, s = visit_expr(kwarg_ast.value, Context(predicted_struct=merge(kwarg_type, expected_arg_struct)), config=self.config)
+                    _, s = visit_expr(kwarg_ast.value,
+                                      Context(predicted_struct=merge(kwarg_type, expected_arg_struct)),
+                                      config=self.config)
                     rv = merge(rv, s)
                     to_args.remove((expected_arg_name, expected_arg_struct))
                     del self.passed_kwargs[kwarg_name]
