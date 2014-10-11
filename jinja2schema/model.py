@@ -276,27 +276,3 @@ class Unknown(Variable):
     """A variable which type is unknown."""
     def __repr__(self):
         return '<unknown>'
-
-
-class Macro(object):
-    """A macro.
-
-    .. attribute:: name
-
-        Name.
-
-    .. attribute:: args
-
-        Positional arguments. A list of 2-tuples whose first element is string that
-        contains argument name and second is a :class:`Variable` -- a structure which
-        expected of that argument.
-        Arguments must be in the same order as they are listed in macro signature.
-
-    .. attribute:: kwargs
-
-        The same as :attr:`args`, but keyword arguments.
-    """
-    def __init__(self, name, args, kwargs):
-        self.name = name
-        self.args = args
-        self.kwargs = kwargs

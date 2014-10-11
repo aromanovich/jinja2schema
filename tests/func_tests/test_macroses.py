@@ -5,7 +5,8 @@ from jinja2 import nodes
 from jinja2schema.core import parse, infer
 from jinja2schema.visitors.stmt import visit_macro
 from jinja2schema.exceptions import MergeException, InvalidExpression, UnexpectedExpression
-from jinja2schema.model import Dictionary, Scalar, String, Number, Macro, Boolean
+from jinja2schema.model import Dictionary, Scalar, String, Number, Boolean
+from jinja2schema.macro import Macro
 
 
 def test_macro_visitor_1():
@@ -102,12 +103,10 @@ def test_macro_call_3():
 
     {{ format_hello({}, 2, 'value', 'value') }}
     '''
-    with pytest.raises(UnexpectedExpression) as e:
+    with pytest.raises(MergeException) as e:
         infer(template)
-    # TODO it should be clear which argument caused conflict
-    assert str(e.value) == ('conflict on the line 7\n'
-                            'got: AST node jinja2.nodes.Dict of structure {}\n'
-                            'expected structure: <scalar>')
+    assert str(e.value) == ('unnamed variable (used as dictionary on lines 7) conflicts with '
+                            'variable "argument #1" (used as scalar on lines: 2)')
 
     template = '''
     {% macro format_hello(name, n, m='test', o='test') -%}
@@ -117,12 +116,10 @@ def test_macro_call_3():
 
     {{ format_hello(a, 2, 'value', {}) }}
     '''
-    with pytest.raises(UnexpectedExpression) as e:
+    with pytest.raises(MergeException) as e:
         infer(template)
-    # TODO it should be clear which argument caused conflict
-    assert str(e.value) == ('conflict on the line 7\n'
-                            'got: AST node jinja2.nodes.Dict of structure {}\n'
-                            'expected structure: <string>')
+    assert str(e.value) == ('unnamed variable (used as dictionary on lines 7) conflicts with '
+                            'variable "argument "o"" (used as string on lines: 2)')
 
 
 def test_macro_wrong_args():
@@ -143,7 +140,7 @@ def test_macro_wrong_args():
         infer(template)
     assert str(e.value) == 'line 6: incorrect usage of "format_hello". it takes exactly 2 positional arguments'
 
-    template = macro_template + '{{ format_hello(missing=123) }}'
+    template = macro_template + '{{ format_hello(1, 2, missing=123) }}'
     with pytest.raises(InvalidExpression) as e:
         infer(template)
-    assert str(e.value) == 'line 6: incorrect usage of "format_hello". unknown argument "missing"'
+    assert str(e.value) == 'line 6: incorrect usage of "format_hello". unknown keyword argument "missing" is passed'

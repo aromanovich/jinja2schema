@@ -138,7 +138,7 @@ def visits_expr(node_cls):
     return decorator
 
 
-def visit_expr(ast, ctx, macroses, config=default_config):
+def visit_expr(ast, ctx, macroses=None, config=default_config):
     """Returns a structure of ``ast``.
 
     :param ctx: :class:`Context`
@@ -331,79 +331,28 @@ def visit_cond_expr(ast, ctx, macroses=None, config=default_config):
     return rtype, struct
 
 
-def check_macro_call(ast, macro, args, kwargs, config):
-    # XXX the code needs to be refactored
-    rv = Dictionary()
-
-    expected_args = macro.args[:]
-    expected_kwargs = macro.kwargs[:]
-
-    def match_args(rv, args, expected_args):
-        matched_args = list(zip(args, expected_args))
-        for i, ((arg_ast, arg), (expected_arg_name, expected_arg)) in enumerate(matched_args, start=1):
-            arg.label = 'argument #{0}'.format(i)
-            _, s = visit_expr(arg_ast, Context(predicted_struct=expected_arg), {}, config)
-            rv = merge(rv, s)
-
-        args = args[len(matched_args):]
-        expected_args = expected_args[len(matched_args):]
-        return args, expected_args, rv
-
-    args, expected_args, rv = match_args(rv, args, expected_args)
-
-    if args:
-        args, expected_kwargs, rv = match_args(rv, args, expected_kwargs)
-
-    def match_kwarg(rv, kwarg_name, kwarg_ast, kwarg, expected_kwargs):
-        r = []
-        found = False
-        for (expected_kwarg_name, expected_kwarg) in expected_kwargs:
-            if kwarg_name == expected_kwarg_name:
-                _, s = visit_expr(kwarg_ast.value, Context(predicted_struct=expected_kwarg), {}, config)
-                rv = merge(rv, s)
-                found = True
-            else:
-                r.append((expected_kwarg_name, expected_kwarg))
-        return rv, r, found
-
-    for kwarg, (kwarg_ast, kwarg_type) in _compat.iteritems(kwargs):
-        rv, expected_args, found_1 = match_kwarg(rv, kwarg, kwarg_ast, kwarg_type, expected_args)
-        rv, expected_kwargs, found_2 = match_kwarg(rv, kwarg, kwarg_ast, kwarg_type, expected_kwargs)
-        if not (found_1 or found_2):
-            raise InvalidExpression(ast, 'incorrect usage of "{0}". unknown argument "{1}"'.format(macro.name, kwarg))
-
-    if args or expected_args:
-        raise InvalidExpression(ast, ('incorrect usage of "{0}". it takes '
-                                      'exactly {1} positional arguments'.format(macro.name, len(macro.args))))
-
-    return rv
-
-
 @visits_expr(nodes.Call)
 def visit_call(ast, ctx, macroses=None, config=default_config):
     if isinstance(ast.node, nodes.Name):
         if macroses and ast.node.name in macroses:
-            # XXX the code needs to be refactored
-            struct = Dictionary()
             macro = macroses[ast.node.name]
+            call = MacroCall(macro, ast.args, ast.kwargs, config=config)
+            args_struct = call.match_passed_args_to_expected_args()
+            if call.passed_args:
+                args_struct = merge(args_struct, call.match_passed_args_to_expected_kwargs())
+            if call.passed_kwargs:
+                args_struct = merge(args_struct, call.match_passed_kwargs_to_expected_args())
+            if call.passed_kwargs:
+                args_struct = merge(args_struct, call.match_passed_kwargs_to_expected_kwargs())
 
-            arg_structures = []
-            for arg_ast in ast.args:
-                arg_rtype, arg_struct = visit_expr(
-                    arg_ast, Context(predicted_struct=Unknown.from_ast(arg_ast)), macroses, config=config)
-                struct = merge(struct, arg_struct)
-                arg_structures.append((arg_ast, arg_rtype))
-
-            kwarg_structures = {}
-            for kwarg_ast in ast.kwargs:
-                kwarg_rtype, kwarg_struct = visit_expr(
-                    kwarg_ast.value, Context(predicted_struct=Unknown.from_ast(kwarg_ast)), macroses, config=config)
-                struct = merge(struct, kwarg_struct)
-                kwarg_structures[kwarg_ast.key] = (kwarg_ast, kwarg_rtype)
-
-            args_struct = check_macro_call(ast, macro, arg_structures, kwarg_structures, config)
-
-            return Unknown(), merge(args_struct, struct)
+            if call.passed_args or call.expected_args:
+                raise InvalidExpression(ast, ('incorrect usage of "{0}". it takes '
+                                              'exactly {1} positional arguments'.format(macro.name, len(macro.args))))
+            if call.passed_kwargs:
+                first_unknown_kwarg = _compat.iterkeys(call.passed_kwargs).next()
+                raise InvalidExpression(ast, ('incorrect usage of "{0}". unknown keyword argument '
+                                              '"{1}" is passed'.format(macro.name, first_unknown_kwarg)))
+            return Unknown(), args_struct
         elif ast.node.name == 'range':
             ctx.meet(List(Unknown()), ast)
             struct = Dictionary()
@@ -415,7 +364,7 @@ def visit_call(ast, ctx, macroses=None, config=default_config):
         elif ast.node.name == 'lipsum':
             ctx.meet(Scalar(), ast)
             struct = Dictionary()
-            # perhaps TODO: set possible types for args and kwargs
+            # probable TODO: set possible types for args and kwargs
             for arg in ast.args:
                 arg_rtype, arg_struct = visit_expr(arg, Context(predicted_struct=Scalar.from_ast(arg)), macroses, config=config)
                 struct = merge(struct, arg_struct)
@@ -604,3 +553,6 @@ def visit_list(ast, ctx, macroses=None, config=default_config):
 def visit_dict(ast, ctx, macroses=None, config=default_config):
     ctx.meet(Dictionary(), ast)
     return _visit_dict(ast, ctx, macroses, [(item.key, item.value) for item in ast.items], config=config)
+
+
+from ..macro import MacroCall

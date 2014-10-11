@@ -10,9 +10,9 @@ import functools
 
 from jinja2 import nodes
 from jinja2schema.config import default_config
-from jinja2schema.util import debug_repr
 
-from ..model import Scalar, Dictionary, List, Unknown, Tuple, Boolean, Macro
+from ..model import Scalar, Dictionary, List, Unknown, Tuple, Boolean
+from ..macro import Macro
 from ..mergers import merge, merge_many
 from ..exceptions import InvalidExpression
 from .. import _compat
