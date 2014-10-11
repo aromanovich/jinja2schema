@@ -349,7 +349,7 @@ def visit_call(ast, ctx, macroses=None, config=default_config):
                 raise InvalidExpression(ast, ('incorrect usage of "{0}". it takes '
                                               'exactly {1} positional arguments'.format(macro.name, len(macro.args))))
             if call.passed_kwargs:
-                first_unknown_kwarg = _compat.iterkeys(call.passed_kwargs).next()
+                first_unknown_kwarg = next(_compat.iterkeys(call.passed_kwargs))
                 raise InvalidExpression(ast, ('incorrect usage of "{0}". unknown keyword argument '
                                               '"{1}" is passed'.format(macro.name, first_unknown_kwarg)))
             return Unknown(), args_struct

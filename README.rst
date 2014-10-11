@@ -19,7 +19,6 @@ A library providing heuristic type inference algorithm for `Jinja2`_ templates.
     ... {% for x in xs %}
     ...   {{ x }}
     ... {% endfor %}
-    ...
     ''')
     >>> s
     {'xs': [<scalar>]}

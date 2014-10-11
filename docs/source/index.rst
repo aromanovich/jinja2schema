@@ -8,9 +8,9 @@ Introduction
 
 jinja2schema is a library for inferring types from `Jinja2`_ templates.
 
-One of the possible usages of jinja2schema is to create a JSON schema of a context expected by the template
-and then use it to render an HTML form (using such JS libraries as `angular-schema-form`_,
-`Alpaca`_ or `JSON Editor`_) or to validate a user input.
+One of the possible usages of jinja2schema is to create a JSON schema of a context
+expected by the template and then use it to render an HTML form (using such JS libraries
+as `angular-schema-form`_, `Alpaca`_ or `JSON Editor`_) or to validate a user input.
 
 The library is in an early stage of development. Although the code is extensively tested,
 please be prepared for bugs or inconsistencies and if you find some,
@@ -19,19 +19,30 @@ let the author know by `opening a ticket`_.
 Examples
 --------
 
-Let's get started by inferring types from some expressions.
+Let's start with inferring types from some expressions:
 
     >>> from jinja2schema import infer
-    >>> infer('{{ x }}')
+    >>> s = infer('{{ x }}')
+    >>> s
     {'x': <scalar>}
+    >>> type(s)
+    <class 'jinja2schema.model.Dictionary'>
+    >>> type(s['x'])
+    <class 'jinja2schema.model.Scalar'>
+
     >>> infer('{{ x.a.b }}')
     {'x': {'a': {'b': <scalar>}}}
-    >>> infer('{{ x.a.b|first }}')
-    {'x': {'a': {'b': [<scalar>]}}}
-    >>> infer('{{ (x.a.b|first).name }}')
-    {'x': {'a': {'b': [{'name': <scalar>}]}}
 
-jinja2schema supports all the flow control structures...
+    >>> s = infer('{{ xs|first }}')
+    >>> s
+    {'xs': [<scalar>]}
+    >>> type(s['xs'])
+    <class 'jinja2schema.model.List'>
+
+    >>> infer('{{ (xs|first).name }}')
+    {'xs': [{'name': <scalar>}]}
+
+jinja2schema supports all Jinja2 control structures:
 
     >>> infer('''
     ... {% for row in items|batch(3, '&nbsp;') %}
@@ -44,24 +55,54 @@ jinja2schema supports all the flow control structures...
     ...     {% endfor %}
     ... {% endfor %}
     ... ''')
-    {'items': [{'desc': <scalar>, 'has_title': <unknown>, 'title': <scalar>}]}
+    {
+        'items': [{
+            'desc': <scalar>,
+            'has_title': <unknown>,
+            'title': <scalar>
+        }]
+    }
 
-...and doesn't get confused by scopes.
+It works correctly with nested scopes:
 
     >>> s = infer('''
     ... {% for x in xs %}
     ...     {% for x in ys %}
-    ...         {{ x.a }}
+    ...         {{ x.c }}
     ...     {% endfor %}
-    ...     {{ x.b }}
+    ...     {{ x.a }}
+    ... {% endfor %}
+    ... {% for a in xs %}
+    ...     {{ a.b }}
     ... {% endfor %}
     ... ''')
     >>> s
-    {'xs': [{'b': <scalar>}], 'ys': [{'a': <scalar>}]}
+    {
+        'xs': [{'a': <scalar>, 'b': <scalar>}],
+        'ys': [{'c': <scalar>}]
+    }
 
-As it was said before, any structure can be converted to `JSON schema`_.
+jinja2schema supports macroses:
 
-    >>> schema = infer('{% for x in xs %}{{ x }}{% endfor %}').to_json_schema()
+    >>> s = infer('''
+    ... {% macro user(login, name) %}
+    ...   {{ login }} {{ name.first }} {{ name.last }}
+    ... {% endmacro %}
+    ... {% for user in users %}
+    ...   {{ user(user.login, user.name) }}
+    ... {% endfor %}
+    ... ''')
+    >>> s
+    {
+        'users': [{
+            'login': <scalar>
+            'name': {'first': <scalar>, 'last': <scalar>}
+        }]
+    }
+
+A result of :func:`jinja2schema.infer` can be converted to `JSON schema`_ using :func:`jinja2schema.to_json_schema`.
+
+    >>> schema = to_json_schema(infer('{% for x in xs %}{{ x }}{% endfor %}'))
     >>> print json.dumps(schema, indent=2)
     {
       "type": "object",
@@ -83,7 +124,7 @@ As it was said before, any structure can be converted to `JSON schema`_.
       "required": ["xs"]
     }
 
-To get a more detailed representation of a structure, one could use :func:`jinja2schema.util.debug_repr`.
+A more detailed representation of the structure can be obtained using :func:`jinja2schema.util.debug_repr`.
 
     >>> from jinja2schema.util import debug_repr
     >>> print debug_repr(s)
@@ -121,7 +162,7 @@ jinja2schema algorithm based on the following common sense assumptions.
 
 * If ``x`` is printed (``{{ x }}``), ``x`` is a scalar: a string, a number or a boolean;
 * If ``x`` is used as an iterable in for loop (``{% for item in x %}``), used with
-  a filter that accepts lists (``x|first``), or being indexed with a number (``x[0]``),
+  a list filter (i.e., ``x|first``), or being indexed with a number (``x[0]``),
   ``x`` is a list;
 * If ``x`` is used with a dot (``x.field``) or being indexed with a string (``x['field']``),
   ``x`` is a dictionary.
@@ -160,10 +201,21 @@ To infer types from a template, simply call :func:`jinja2schema.infer`.
 
 .. autofunction:: jinja2schema.infer
 
-It will return a :class:`.model.Variable` instance, which can be converted to
-JSON schema using :meth:`to_json_schema` method.
+It's logic can be tuned by specifying a custom :class:`jinja2schema.config.Config`.
 
-:func:`infer` logic can be tuned by specifying a custom :class:`jinja2schema.config.Config`.
+|
+
+A :class:`.models.Dictionary` returned by ``infer`` can be converted to
+JSON schema using :meth:`jinja2schema.to_json_schema` method.
+
+.. autofunction:: jinja2schema.to_json_schema
+
+Standard JSON schema encoders are:
+
+.. autoclass:: jinja2schema.JSONSchemaDraft4Encoder
+.. autoclass:: jinja2schema.StringJSONSchemaDraft4Encoder
+
+|
 
 If you need more than that, please take a look at :ref:`internals`.
 

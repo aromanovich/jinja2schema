@@ -267,7 +267,7 @@ class Number(Scalar):
 
 
 class Boolean(Scalar):
-    """A number."""
+    """A boolean."""
     def __repr__(self):
         return '<boolean>'
 

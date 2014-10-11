@@ -67,7 +67,7 @@ def infer(template, config=Config()):
 
 
 class JSONSchemaDraft4Encoder(object):
-    """Extensible JSON schema encoder for :class:`.model.Variable`s."""
+    """Extensible JSON schema encoder for :class:`.model.Variable`."""
 
     def encode_common_attrs(self, var):
         """Returns a subset of JSON schema of variable `var` that describes
@@ -126,9 +126,9 @@ class JSONSchemaDraft4Encoder(object):
         return rv
 
 
-class StringJSONSchemaEncoder(JSONSchemaDraft4Encoder):
-    """Encodes :class:`Unknown` and :class:`Scalar` (but not scalar subclasses --
-    string, number or boolean) variables as strings.
+class StringJSONSchemaDraft4Encoder(JSONSchemaDraft4Encoder):
+    """Encodes :class:`.model.Unknown` and :class:`.model.Scalar` (but not it's subclasses --
+    :class:`.model.String`, :class:`.model.Number` or :class:`.model.Boolean`) variables as strings.
 
     Useful for rendering forms using resulting JSON schema, as most of form-rendering
     tools do not support "anyOf" validator.
@@ -138,12 +138,13 @@ class StringJSONSchemaEncoder(JSONSchemaDraft4Encoder):
             rv = self.encode_common_attrs(var)
             rv['type'] = 'string'
         else:
-            rv = super(StringJSONSchemaEncoder, self).encode(var)
+            rv = super(StringJSONSchemaDraft4Encoder, self).encode(var)
         return rv
 
 
 def to_json_schema(var, jsonschema_encoder=JSONSchemaDraft4Encoder):
-    """
+    """Returns JSON schema that describes ``var``.
+
     :param var: a variable
     :type var: :class:`.model.Variable`
     :param jsonschema_encoder: JSON schema encoder
