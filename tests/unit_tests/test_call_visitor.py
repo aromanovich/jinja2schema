@@ -77,6 +77,21 @@ def test_str_method_calls():
     })
     assert struct == expected_struct
 
+    template = '''{{ x.split(separator) }}'''
+    call_ast = parse(template).find(nodes.Call)
+    ctx = Context(return_struct_cls=Unknown, predicted_struct=Unknown.from_ast(call_ast))
+    rtype, struct = visit_call(call_ast, ctx)
+
+    expected_rtype = List(String())
+    assert rtype == expected_rtype
+
+    expected_struct = Dictionary({
+        'x': String(label='x', linenos=[1]),
+        'separator': String(label='separator', linenos=[1]),
+    })
+    assert struct == expected_struct
+
+
 
 def test_raise_on_unknown_call():
     for template in ('{{ x.some_unknown_f() }}', '{{ xxx() }}'):

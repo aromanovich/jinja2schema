@@ -390,8 +390,16 @@ def visit_call(ast, ctx, macroses=None, config=default_config):
             rtype, struct = visit_expr(
                 ast.node.node, Context(predicted_struct=String.from_ast(ast.node.node)), macroses, config=config)
             return Boolean(), struct
-        else:
-            raise InvalidExpression(ast, '"{0}" call is not supported'.format(ast.node.attr))
+        if ast.node.attr == 'split':
+            ctx.meet(List(String()), ast)
+            rtype, struct = visit_expr(
+                ast.node.node, Context(predicted_struct=String.from_ast(ast.node.node)), macroses, config=config)
+            if ast.args:
+                arg = ast.args[0]
+                _, arg_struct = visit_expr(arg, Context(predicted_struct=String.from_ast(arg)), macroses, config=config)
+                struct = merge(struct, arg_struct)
+            return List(String()), struct
+        raise InvalidExpression(ast, '"{0}" call is not supported'.format(ast.node.attr))
 
 
 @visits_expr(nodes.Filter)
