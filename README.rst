@@ -2,11 +2,16 @@ jinja2schema
 ============
 
 .. image:: https://travis-ci.org/aromanovich/jinja2schema.svg?branch=master
-   :target: https://travis-ci.org/aromanovich/jinja2schema
+    :target: https://travis-ci.org/aromanovich/jinja2schema
+    :alt: Build Status
+
+.. image:: https://coveralls.io/repos/aromanovich/jinja2schema/badge.svg?branch=master
+    :target: https://coveralls.io/r/aromanovich/jinja2schema?branch=master
+    :alt: Coverage
 
 Demo_ | Documentation_ | GitHub_ |  PyPI_
 
-A library providing heuristic type inference algorithm for `Jinja2`_ templates.
+A library that provides a heuristic type inference algorithm for `Jinja2`_ templates.
 
 .. code-block:: python
 
