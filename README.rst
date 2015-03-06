@@ -9,6 +9,14 @@ jinja2schema
     :target: https://coveralls.io/r/aromanovich/jinja2schema?branch=master
     :alt: Coverage
 
+.. image:: http://img.shields.io/pypi/v/jinja2schema.svg
+    :target: https://pypi.python.org/pypi/jinja2schema
+    :alt: PyPI Version
+
+.. image:: http://img.shields.io/pypi/dm/jinja2schema.svg
+    :target: https://pypi.python.org/pypi/jinja2schema
+    :alt: PyPI Downloads
+
 Demo_ | Documentation_ | GitHub_ |  PyPI_
 
 A library that provides a heuristic type inference algorithm for `Jinja2`_ templates.
