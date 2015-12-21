@@ -8,14 +8,14 @@ Statement visitors return :class:`.models.Dictionary` of structures of variables
 """
 import functools
 
-from jinja2 import nodes
+from jinja2 import nodes, Environment, PackageLoader
 from jinja2schema.config import default_config
 
 from ..model import Scalar, Dictionary, List, Unknown, Tuple, Boolean
 from ..macro import Macro
 from ..mergers import merge, merge_many
 from ..exceptions import InvalidExpression
-from .. import _compat
+from .._compat import iteritems, izip, zip_longest
 from .expr import Context, visit_expr
 from .util import visit_many
 
@@ -46,7 +46,7 @@ def visit_stmt(ast, macroses=None, config=default_config):
     """
     visitor = stmt_visitors.get(type(ast))
     if not visitor:
-        for node_cls, visitor_ in stmt_visitors.iteritems():
+        for node_cls, visitor_ in iteritems(stmt_visitors):
             if isinstance(ast, node_cls):
                 visitor = visitor_
     if not visitor:
@@ -95,7 +95,7 @@ def visit_if(ast, macroses=None, config=default_config):
     else_struct = visit_many(ast.else_, macroses, config, predicted_struct_cls=Scalar) if ast.else_ else Dictionary()
     struct = merge_many(test_struct, if_struct, else_struct)
 
-    for var_name, var_struct in test_struct.iteritems():
+    for var_name, var_struct in iteritems(test_struct):
         if var_struct.checked_as_defined or var_struct.checked_as_undefined:
             if var_struct.checked_as_undefined:
                 lookup_struct = if_struct
@@ -125,7 +125,7 @@ def visit_assign(ast, macroses=None, config=default_config):
             if len(ast.target.items) != len(ast.node.items):
                 raise InvalidExpression(ast, 'number of items in left side is different '
                                              'from right side')
-            for name_ast, var_ast in _compat.izip(ast.target.items, ast.node.items):
+            for name_ast, var_ast in izip(ast.target.items, ast.node.items):
                 variables.append((name_ast.name, var_ast))
         for var_name, var_ast in variables:
             var_rtype, var_struct = visit_expr(var_ast, Context(predicted_struct=Unknown.from_ast(var_ast)), macroses, config)
@@ -160,7 +160,7 @@ def visit_macro(ast, macroses=None, config=default_config):
     kwargs = []
     body_struct = visit_many(ast.body, macroses, config, predicted_struct_cls=Scalar)
 
-    for i, (arg, default_value_ast) in enumerate(reversed(list(_compat.zip_longest(reversed(ast.args),
+    for i, (arg, default_value_ast) in enumerate(reversed(list(zip_longest(reversed(ast.args),
                                                                            reversed(ast.defaults)))), start=1):
         has_default_value = bool(default_value_ast)
         if has_default_value:
