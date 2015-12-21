@@ -190,6 +190,13 @@ def visit_macro(ast, macroses=None, config=default_config):
     return body_struct
 
 
+@visits_stmt(nodes.Include)
+def visit_include(ast, macroses=None, config=default_config):
+    env = Environment(loader=PackageLoader(config.PACKAGE_NAME, config.TEMPLATE_DIR))
+    template = env.parse(env.loader.get_source(env, ast.template.value)[0])
+    return visit_many(template.body, macroses, config)
+
+
 @visits_stmt(nodes.Block)
 def visit_block(ast, macroses=None, config=default_config):
     return visit_many(ast.body, macroses, config)
