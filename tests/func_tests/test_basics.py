@@ -413,3 +413,18 @@ def test_boolean_conditions_setting_2():
     })
     assert struct == expected_struct
 
+def test_block_1():
+    config = Config()
+
+    template = '''
+        {% block test %}
+            {{ x }}
+            {{ y }}
+        {% endblock %}
+    '''
+    struct = infer(template, config)
+    expected_struct = Dictionary({
+        'x': Scalar(label='x', linenos=[3]),
+        'y':  Scalar(label='y', linenos=[4]),
+    })
+    assert struct == expected_struct
