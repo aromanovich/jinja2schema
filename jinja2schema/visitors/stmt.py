@@ -195,8 +195,14 @@ def visit_block(ast, macroses=None, config=default_config):
     return visit_many(ast.body, macroses, config)
 
 
-@visits_stmt((nodes.Extends, nodes.Include))
-def visit_inheritance(ast, macroses=None, config=default_config, child_blocks=None):
+@visits_stmt(nodes.Include)
+def visit_include(ast, macroses=None, config=default_config, child_blocks=None):
+    template = get_inherited_template(config, ast)
+    return visit_many(template.body, macroses, config)
+
+
+@visits_stmt(nodes.Extends)
+def visit_extends(ast, macroses=None, config=default_config, child_blocks=None):
     template = get_inherited_template(config, ast)
     if not child_blocks:
         return visit_many(template.body, macroses, config)

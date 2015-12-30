@@ -30,8 +30,8 @@ def visit_many(nodes, macroses, config, predicted_struct_cls=Scalar, return_stru
     """
     rv = Dictionary()
     for node in nodes:
-        if isinstance(node, (jinja2.nodes.Include, jinja2.nodes.Extends)):
-            structure = visit_inheritance(node, macroses, config, [x for x in nodes if isinstance(x, jinja2.nodes.Block)])
+        if isinstance(node, jinja2.nodes.Extends):
+            structure = visit_extends(node, macroses, config, [x for x in nodes if isinstance(x, jinja2.nodes.Block)])
         else:
             structure = visit(node, macroses, config, predicted_struct_cls, return_struct_cls)
         rv = merge(rv, structure)
@@ -40,4 +40,4 @@ def visit_many(nodes, macroses, config, predicted_struct_cls=Scalar, return_stru
 
 # keep these at the end of file to avoid circular imports
 from .expr import Context, visit_expr
-from .stmt import visit_stmt, visit_inheritance
+from .stmt import visit_stmt, visit_extends

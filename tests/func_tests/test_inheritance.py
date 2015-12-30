@@ -25,38 +25,7 @@ def test_include_override_1():
     env = Environment(loader=PackageLoader('tests', 'templates'))
     struct = infer(env.loader.get_source(env, 'inner_include_override_1.html')[0], Config(PACKAGE_NAME='tests'))
     expected_struct = Dictionary({
-        'name':  Scalar(label='name', linenos=[3]),
-    })
-    assert struct == expected_struct
-
-def test_include_override_2():
-    env = Environment(loader=PackageLoader('tests', 'templates'))
-    struct = infer(env.loader.get_source(env, 'inner_include_override_2.html')[0], Config(PACKAGE_NAME='tests'))
-    expected_struct = Dictionary({
-        'name':  Scalar(label='name', linenos=[3]),
-        'location':  Scalar(label='location', linenos=[6]),
-        'default_mood':  Scalar(label='default_mood', linenos=[8]),
-    })
-    assert struct == expected_struct
-
-def test_include_override_3():
-    env = Environment(loader=PackageLoader('tests', 'templates'))
-    struct = infer(env.loader.get_source(env, 'inner_include_override_3.html')[0], Config(PACKAGE_NAME='tests'))
-    expected_struct = Dictionary({
-        'location':  Scalar(label='location', linenos=[6]),
-        'mood':  Scalar(label='mood', linenos=[9]),
-        'name':  Scalar(label='name', linenos=[3]),
-    })
-    assert struct == expected_struct
-
-def test_include_override_4():
-    env = Environment(loader=PackageLoader('tests', 'templates'))
-    struct = infer(env.loader.get_source(env, 'inner_include_override_4.html')[0], Config(PACKAGE_NAME='tests'))
-    expected_struct = Dictionary({
-        'noblock':  Scalar(label='noblock', linenos=[1]),
-        'brake':  Scalar(label='brake', linenos=[3]),
-        'location':  Scalar(label='location', linenos=[6]),
-        'mood':  Scalar(label='mood', linenos=[9]),
+        'default_name':  Scalar(label='default_name', linenos=[2]),
         'name':  Scalar(label='name', linenos=[3]),
     })
     assert struct == expected_struct
