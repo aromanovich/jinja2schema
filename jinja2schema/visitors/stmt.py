@@ -188,3 +188,8 @@ def visit_macro(ast, macroses=None, config=default_config):
     for arg in args_struct.iterkeys():
         body_struct.pop(arg, None)
     return body_struct
+
+
+@visits_stmt(nodes.Block)
+def visit_block(ast, macroses=None, config=default_config):
+    return visit_many(ast.body, macroses, config)
