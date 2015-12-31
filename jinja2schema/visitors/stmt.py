@@ -8,7 +8,7 @@ Statement visitors return :class:`.models.Dictionary` of structures of variables
 """
 import functools
 
-from jinja2 import nodes
+from jinja2 import nodes, Environment, PackageLoader
 from jinja2schema.config import default_config
 
 from ..model import Scalar, Dictionary, List, Unknown, Tuple, Boolean
@@ -31,14 +31,14 @@ def visits_stmt(node_cls):
     def decorator(func):
         stmt_visitors[node_cls] = func
         @functools.wraps(func)
-        def wrapped_func(ast, macroses=None, config=default_config):
+        def wrapped_func(ast, macroses=None, config=default_config, child_blocks=None):
             assert isinstance(ast, node_cls)
-            return func(ast, macroses, config)
+            return func(ast, macroses, config, child_blocks)
         return wrapped_func
     return decorator
 
 
-def visit_stmt(ast, macroses=None, config=default_config):
+def visit_stmt(ast, macroses=None, config=default_config, child_blocks=None):
     """Returns a structure of ``ast``.
 
     :param ast: instance of :class:`jinja2.nodes.Stmt`
@@ -55,7 +55,7 @@ def visit_stmt(ast, macroses=None, config=default_config):
 
 
 @visits_stmt(nodes.For)
-def visit_for(ast, macroses=None, config=default_config):
+def visit_for(ast, macroses=None, config=default_config, child_blocks=None):
     body_struct = visit_many(ast.body, macroses, config, predicted_struct_cls=Scalar)
     else_struct = visit_many(ast.else_, macroses, config, predicted_struct_cls=Scalar)
 
@@ -84,7 +84,7 @@ def visit_for(ast, macroses=None, config=default_config):
 
 
 @visits_stmt(nodes.If)
-def visit_if(ast, macroses=None, config=default_config):
+def visit_if(ast, macroses=None, config=default_config, child_blocks=None):
     if config.BOOLEAN_CONDITIONS:
         test_predicted_struct = Boolean.from_ast(ast.test)
     else:
@@ -114,7 +114,7 @@ def visit_if(ast, macroses=None, config=default_config):
 
 
 @visits_stmt(nodes.Assign)
-def visit_assign(ast, macroses=None, config=default_config):
+def visit_assign(ast, macroses=None, config=default_config, child_blocks=None):
     struct = Dictionary()
     if (isinstance(ast.target, nodes.Name) or
             (isinstance(ast.target, nodes.Tuple) and isinstance(ast.node, nodes.Tuple))):
@@ -149,12 +149,12 @@ def visit_assign(ast, macroses=None, config=default_config):
 
 
 @visits_stmt(nodes.Output)
-def visit_output(ast, macroses=None, config=default_config):
+def visit_output(ast, macroses=None, config=default_config, child_blocks=None):
     return visit_many(ast.nodes, macroses, config, predicted_struct_cls=Scalar)
 
 
 @visits_stmt(nodes.Macro)
-def visit_macro(ast, macroses=None, config=default_config):
+def visit_macro(ast, macroses=None, config=default_config, child_blocks=None):
     # XXX the code needs to be refactored
     args = []
     kwargs = []
@@ -193,3 +193,41 @@ def visit_macro(ast, macroses=None, config=default_config):
 @visits_stmt(nodes.Block)
 def visit_block(ast, macroses=None, config=default_config):
     return visit_many(ast.body, macroses, config)
+
+
+@visits_stmt(nodes.Include)
+def visit_include(ast, macroses=None, config=default_config, child_blocks=None):
+    template = get_inherited_template(config, ast)
+    return visit_many(template.body, macroses, config)
+
+
+@visits_stmt(nodes.Extends)
+def visit_extends(ast, macroses=None, config=default_config, child_blocks=None):
+    template = get_inherited_template(config, ast)
+    if not child_blocks:
+        return visit_many(template.body, macroses, config)
+    return visit_many(get_correct_nodes(child_blocks, template.body), None, config)
+
+
+def get_inherited_template(config, ast):
+    env = Environment(loader=PackageLoader(config.PACKAGE_NAME, config.TEMPLATE_DIR))
+    return env.parse(env.loader.get_source(env, ast.template.value)[0])
+
+
+def separate_template_blocks(template, blocks, template_nodes):
+    for node in template:
+        if isinstance(node, nodes.Block):
+            blocks.append(node)
+        else:
+            template_nodes.append(node)
+    return blocks, template_nodes
+
+
+def get_correct_nodes(child_blocks, template):
+    parent_blocks, nodes = separate_template_blocks(template, [], [])
+    child_block_names = [c.name for c in child_blocks]
+    blocks = child_blocks + parent_blocks
+    for parent_block in parent_blocks:
+        if parent_block.name in child_block_names:
+            blocks.remove(parent_block)
+    return blocks + nodes
