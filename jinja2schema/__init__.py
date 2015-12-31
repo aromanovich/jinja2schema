@@ -17,7 +17,7 @@ __title__ = 'jinja2schema'
 __author__ = 'Anton Romanovich'
 __license__ = 'BSD'
 __copyright__ = 'Copyright 2014 Anton Romanovich'
-__version__ = '0.1.1'
+__version__ = '0.1.2'
 __version_info__ = tuple(int(i) for i in __version__.split('.'))
 
 
