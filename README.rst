@@ -73,7 +73,7 @@ License
 .. _Jinja2: http://jinja.pocoo.org/docs/
 .. _Demo: http://jinja2schema.aromanovich.ru/
 .. _demo page: http://jinja2schema.aromanovich.ru/
-.. _Documentation: http://jinja2schema.rtfd.org/
+.. _Documentation: https://jinja2schema.readthedocs.io/
 .. _GitHub: https://github.com/aromanovich/jinja2schema
 .. _PyPI: https://pypi.python.org/pypi/jinja2schema
 .. _BSD license: https://github.com/aromanovich/jinja2schema/blob/master/LICENSE

@@ -6,7 +6,7 @@ jinja2schema
 
 Type inference for Jinja2 templates.
 
-See http://jinja2schema.rtfd.org/ for documentation.
+See https://jinja2schema.readthedocs.io/ for documentation.
 
 :copyright: (c) 2014 Anton Romanovich
 :license: BSD
