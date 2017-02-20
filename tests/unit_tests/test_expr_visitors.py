@@ -186,7 +186,7 @@ def test_slice():
 
 
 def test_test_1():
-    template = '''{{ x is divisibleby data.field }}'''
+    template = '''{{ x is divisibleby (data.field) }}'''
     ast = parse(template).find(nodes.Test)
     rtype, struct = visit_test(ast, get_scalar_context(ast))
 
