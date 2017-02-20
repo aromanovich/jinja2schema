@@ -238,4 +238,4 @@ def test_const():
     template = '''{{ false }}'''
     const_ast = parse(template).find(nodes.Const)
     rtype, struct = visit_const(const_ast, get_scalar_context(const_ast))
-    assert rtype == Boolean(constant=True, linenos=[1])
+    assert rtype == Boolean(constant=True, linenos=[1], value=False)

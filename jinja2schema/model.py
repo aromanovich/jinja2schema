@@ -47,10 +47,14 @@ class Variable(object):
 
         Is true if the variable occurs within ``{% if %}`` block which condition checks
         if the variable is defined.
+
+    .. attribute:: value
+
+        Value of the variable in template. Set by default filter or assignment.
     """
     def __init__(self, label=None, linenos=None, constant=False,
                  may_be_defined=False, used_with_default=False,
-                 checked_as_undefined=False, checked_as_defined=False):
+                 checked_as_undefined=False, checked_as_defined=False, value=None):
         self.label = label
         self.linenos = linenos if linenos is not None else []
         self.constant = constant
@@ -58,6 +62,7 @@ class Variable(object):
         self.used_with_default = used_with_default
         self.checked_as_undefined = checked_as_undefined
         self.checked_as_defined = checked_as_defined
+        self.value = value
 
     def clone(self):
         cls = type(self)
@@ -68,6 +73,7 @@ class Variable(object):
         return {
             'linenos': [ast.lineno],
             'label': ast.name if isinstance(ast, nodes.Name) else None,
+            'value': ast.value if hasattr(ast, 'value') else None,
         }
 
     @classmethod
@@ -97,7 +103,8 @@ class Variable(object):
             self.used_with_default == other.used_with_default and
             self.checked_as_undefined == other.checked_as_undefined and
             self.checked_as_defined == other.checked_as_defined and
-            self.required == other.required
+            self.required == other.required and
+            self.value == other.value
         )
 
     def __ne__(self, other):

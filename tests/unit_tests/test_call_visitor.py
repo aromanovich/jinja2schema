@@ -50,8 +50,8 @@ def test_dict_call():
 
     expected_rtype = Dictionary({
         'x': Dictionary({
-            'a': Number(linenos=[3], constant=True),
-            'b': Number(linenos=[3], constant=True)
+            'a': Number(linenos=[3], constant=True, value=1),
+            'b': Number(linenos=[3], constant=True, value=2)
         }, linenos=[2], constant=True),
         'y': Unknown(label='a', linenos=[3]),
     }, linenos=[1], constant=True)

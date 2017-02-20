@@ -56,7 +56,7 @@ def test_default_filter():
     rtype, struct = visit_filter(ast, get_scalar_context(ast))
 
     expected_struct = Dictionary({
-        'x': String(label='x', linenos=[1], used_with_default=True),
+        'x': String(label='x', linenos=[1], used_with_default=True, value='g'),
     })
     assert struct == expected_struct
 
@@ -135,7 +135,7 @@ def test_join_filter():
     assert rtype == String(label='xs', linenos=[1])
     assert struct == Dictionary({
         'xs': List(String(), label='xs', linenos=[1]),
-        'separator': String(label='separator', linenos=[1], used_with_default=True),
+        'separator': String(label='separator', linenos=[1], used_with_default=True, value='|'),
     })
 
 
