@@ -76,8 +76,8 @@ class JSONSchemaDraft4Encoder(object):
         rv = {}
         if var.label:
             rv['title'] = var.label
-        if var.value:
-            rv['value'] = var.value
+        if var.value and var.used_with_default:
+            rv['default'] = var.value
         return rv
 
     def encode(self, var):
