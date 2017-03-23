@@ -450,6 +450,7 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
             default_value_rtype,
         )
         node_struct.used_with_default = True
+        node_struct.value = default_value_rtype.value
     elif ast.name == 'dictsort':
         ctx.meet(List(Tuple([Scalar(), Unknown()])), ast)
         node_struct = Dictionary.from_ast(ast.node)

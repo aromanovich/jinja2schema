@@ -232,7 +232,7 @@ def test_basics_11():
         'a': Dictionary({
             'attr1': List(String(), label='attr1', linenos=[3]),
             'attr2': List(Scalar(linenos=[4]), label='attr2', linenos=[4], used_with_default=True),
-            'attr3': String(label='attr3', linenos=[5], used_with_default=True)
+            'attr3': String(label='attr3', linenos=[5], used_with_default=True, value='gsom')
         }, label='a', linenos=[2, 3, 4, 5]),
         'xs': List(
             Scalar(label='x', linenos=[7]),  # TODO it should be Dictionary({'is_active': Unknown()})

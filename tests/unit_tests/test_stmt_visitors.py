@@ -101,9 +101,9 @@ def test_assign_4():
 
     struct = visit_assign(ast)
     expected_struct = Dictionary({
-        'a': Number(label='a', linenos=[1], constant=True),
+        'a': Number(label='a', linenos=[1], constant=True, value=1),
         'b': Dictionary(data={
-            'gsom': String(linenos=[1], constant=True),
+            'gsom': String(linenos=[1], constant=True, value='gsom'),
         }, label='b', linenos=[1], constant=True),
         'z': Scalar(label='z', linenos=[1]),
     })
