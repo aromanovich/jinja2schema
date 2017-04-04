@@ -13,7 +13,8 @@ def visit(node, macroses, config, predicted_struct_cls=Scalar, return_struct_cls
     if isinstance(node, jinja2.nodes.Stmt):
         structure = visit_stmt(node, macroses, config)
     elif isinstance(node, jinja2.nodes.Expr):
-        ctx = Context(predicted_struct=predicted_struct_cls.from_ast(node), return_struct_cls=return_struct_cls)
+        ctx = Context(predicted_struct=predicted_struct_cls.from_ast(node, order_nr=config.ORDER_OBJECT.get_next()),
+                      return_struct_cls=return_struct_cls)
         _, structure = visit_expr(node, ctx, macroses, config)
     elif isinstance(node, jinja2.nodes.Template):
         structure = visit_many(node.body, macroses, config)

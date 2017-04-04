@@ -56,8 +56,10 @@ def visit_stmt(ast, macroses=None, config=default_config, child_blocks=None):
 
 @visits_stmt(nodes.For)
 def visit_for(ast, macroses=None, config=default_config, child_blocks=None):
-    body_struct = visit_many(ast.body, macroses, config, predicted_struct_cls=Scalar)
-    else_struct = visit_many(ast.else_, macroses, config, predicted_struct_cls=Scalar)
+    with config.ORDER_OBJECT.sub_counter():
+        body_struct = visit_many(ast.body, macroses, config, predicted_struct_cls=Scalar)
+    with config.ORDER_OBJECT.sub_counter():
+        else_struct = visit_many(ast.else_, macroses, config, predicted_struct_cls=Scalar)
 
     if 'loop' in body_struct:
         # exclude a special `loop` variable from the body structure
@@ -66,16 +68,16 @@ def visit_for(ast, macroses=None, config=default_config, child_blocks=None):
     if isinstance(ast.target, nodes.Tuple):
         target_struct = Tuple.from_ast(
             ast.target,
-            [body_struct.pop(item.name, Unknown.from_ast(ast.target))
-             for item in ast.target.items])
+            [body_struct.pop(item.name, Unknown.from_ast(ast.target, order_nr=config.ORDER_OBJECT.get_next()))
+             for item in ast.target.items], order_nr=config.ORDER_OBJECT.get_next())
     else:
-        target_struct = body_struct.pop(ast.target.name, Unknown.from_ast(ast))
+        target_struct = body_struct.pop(ast.target.name, Unknown.from_ast(ast, order_nr=config.ORDER_OBJECT.get_next()))
 
     iter_rtype, iter_struct = visit_expr(
         ast.iter,
         Context(
             return_struct_cls=Unknown,
-            predicted_struct=List.from_ast(ast, target_struct)),
+            predicted_struct=List.from_ast(ast, target_struct, order_nr=config.ORDER_OBJECT.get_next())),
         macroses, config)
 
     merge(iter_rtype, List(target_struct))
@@ -86,11 +88,11 @@ def visit_for(ast, macroses=None, config=default_config, child_blocks=None):
 @visits_stmt(nodes.If)
 def visit_if(ast, macroses=None, config=default_config, child_blocks=None):
     if config.BOOLEAN_CONDITIONS:
-        test_predicted_struct = Boolean.from_ast(ast.test)
+        test_predicted_struct = Boolean.from_ast(ast.test, order_nr=config.ORDER_OBJECT.get_next())
     else:
-        test_predicted_struct = Unknown.from_ast(ast.test)
+        test_predicted_struct = Unknown.from_ast(ast.test, order_nr=config.ORDER_OBJECT.get_next())
     test_rtype, test_struct = visit_expr(
-        ast.test, Context(predicted_struct=test_predicted_struct), macroses, config)
+            ast.test, Context(predicted_struct=test_predicted_struct), macroses, config)
     if_struct = visit_many(ast.body, macroses, config, predicted_struct_cls=Scalar)
     else_struct = visit_many(ast.else_, macroses, config, predicted_struct_cls=Scalar) if ast.else_ else Dictionary()
     struct = merge_many(test_struct, if_struct, else_struct)
@@ -128,7 +130,8 @@ def visit_assign(ast, macroses=None, config=default_config, child_blocks=None):
             for name_ast, var_ast in izip(ast.target.items, ast.node.items):
                 variables.append((name_ast.name, var_ast))
         for var_name, var_ast in variables:
-            var_rtype, var_struct = visit_expr(var_ast, Context(predicted_struct=Unknown.from_ast(var_ast)), macroses, config)
+            var_rtype, var_struct = visit_expr(var_ast, Context(
+                predicted_struct=Unknown.from_ast(var_ast, order_nr=config.ORDER_OBJECT.get_next())), macroses, config)
             var_rtype.constant = True
             var_rtype.label = var_name
             struct = merge_many(struct, var_struct, Dictionary({
@@ -138,7 +141,7 @@ def visit_assign(ast, macroses=None, config=default_config, child_blocks=None):
     elif isinstance(ast.target, nodes.Tuple):
         tuple_items = []
         for name_ast in ast.target.items:
-            var_struct = Unknown.from_ast(name_ast, constant=True)
+            var_struct = Unknown.from_ast(name_ast, constant=True, order_nr=config.ORDER_OBJECT.get_next())
             tuple_items.append(var_struct)
             struct = merge(struct, Dictionary({name_ast.name: var_struct}))
         var_rtype, var_struct = visit_expr(

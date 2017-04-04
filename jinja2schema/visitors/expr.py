@@ -163,14 +163,16 @@ def _visit_dict(ast, ctx, macroses, items, config=default_config):
     :param items: a list of (key, value); key may be either AST node or string
     """
     ctx.meet(Dictionary(), ast)
-    rtype = Dictionary.from_ast(ast, constant=True)
+    rtype = Dictionary.from_ast(ast, constant=True, order_nr=config.ORDER_OBJECT.get_next())
     struct = Dictionary()
     for key, value in items:
         value_rtype, value_struct = visit_expr(value, Context(
-            predicted_struct=Unknown.from_ast(value)), macroses, config=config)
+            predicted_struct=Unknown.from_ast(value, order_nr=config.ORDER_OBJECT.get_next())), macroses, config=config)
         struct = merge(struct, value_struct)
         if isinstance(key, nodes.Node):
-            key_rtype, key_struct = visit_expr(key, Context(predicted_struct=Scalar.from_ast(key)), macroses, config=config)
+            key_rtype, key_struct = visit_expr(key, Context(
+                predicted_struct=Scalar.from_ast(key, order_nr=config.ORDER_OBJECT.get_next())), macroses,
+                                               config=config)
             struct = merge(struct, key_struct)
             if isinstance(key, nodes.Const):
                 rtype[key.value] = value_rtype
@@ -195,13 +197,14 @@ def visit_unary_expr(ast, ctx, macroses=None, config=default_config):
 @visits_expr(nodes.Compare)
 def visit_compare(ast, ctx, macroses=None, config=default_config):
     ctx.meet(Boolean(), ast)
-    rtype, struct = visit_expr(ast.expr, Context(predicted_struct=Unknown.from_ast(ast.expr)),
-                               macroses, config=config)
+    rtype, struct = visit_expr(ast.expr, Context(
+        predicted_struct=Unknown.from_ast(ast.expr, order_nr=config.ORDER_OBJECT.get_next())), macroses, config=config)
     for op in ast.ops:
-        op_rtype, op_struct = visit_expr(op.expr, Context(predicted_struct=Unknown.from_ast(ast.expr)),
-                                         macroses, config=config)
+        op_rtype, op_struct = visit_expr(op.expr, Context(
+            predicted_struct=Unknown.from_ast(ast.expr, order_nr=config.ORDER_OBJECT.get_next())), macroses,
+                                         config=config)
         struct = merge(struct, op_struct)
-    return Boolean.from_ast(ast), struct
+    return Boolean.from_ast(ast, order_nr=config.ORDER_OBJECT.get_next()), struct
 
 
 @visits_expr(nodes.Slice)
@@ -215,7 +218,9 @@ def visit_slice(ast, ctx, macroses=None, config=default_config):
 
 @visits_expr(nodes.Name)
 def visit_name(ast, ctx, macroses=None, config=default_config):
-    kwargs = {}
+    kwargs = {
+        'order_nr': config.ORDER_OBJECT.get_next()
+    }
     return ctx.return_struct_cls.from_ast(ast, **kwargs), Dictionary({
         ast.name: ctx.get_predicted_struct(label=ast.name)
     })
@@ -227,7 +232,7 @@ def visit_getattr(ast, ctx, macroses=None, config=default_config):
         ctx=ctx,
         predicted_struct=Dictionary.from_ast(ast, {
             ast.attr: ctx.get_predicted_struct(label=ast.attr),
-        }))
+        }, order_nr=config.ORDER_OBJECT.get_next()))
     return visit_expr(ast.node, context, macroses, config=config)
 
 
@@ -237,31 +242,35 @@ def visit_getitem(ast, ctx, macroses=None, config=default_config):
     if isinstance(arg, nodes.Const):
         if isinstance(arg.value, int):
             if config.TYPE_OF_VARIABLE_INDEXED_WITH_INTEGER_TYPE == 'list':
-                predicted_struct = List.from_ast(ast, ctx.get_predicted_struct())
+                predicted_struct = List.from_ast(ast, ctx.get_predicted_struct(),
+                                                 order_nr=config.ORDER_OBJECT.get_next())
             elif config.TYPE_OF_VARIABLE_INDEXED_WITH_INTEGER_TYPE == 'dictionary':
                 predicted_struct = Dictionary.from_ast(ast, {
                     arg.value: ctx.get_predicted_struct(),
-                })
+                }, order_nr=config.ORDER_OBJECT.get_next())
             elif config.TYPE_OF_VARIABLE_INDEXED_WITH_INTEGER_TYPE == 'tuple':
                 items = [Unknown() for i in range(arg.value + 1)]
                 items[arg.value] = ctx.get_predicted_struct()
-                predicted_struct = Tuple.from_ast(ast, tuple(items), may_be_extended=True)
+                predicted_struct = Tuple.from_ast(ast, tuple(items), may_be_extended=True,
+                                                  order_nr=config.ORDER_OBJECT.get_next())
         elif isinstance(arg.value, _compat.string_types):
             predicted_struct = Dictionary.from_ast(ast, {
                 arg.value: ctx.get_predicted_struct(label=arg.value),
-            })
+            }, order_nr=config.ORDER_OBJECT.get_next())
         else:
             raise InvalidExpression(arg, '{0} is not supported as an index for a list or'
                                          ' a key for a dictionary'.format(arg.value))
     elif isinstance(arg, nodes.Slice):
-        predicted_struct = List.from_ast(ast, ctx.get_predicted_struct())
+        predicted_struct = List.from_ast(ast, ctx.get_predicted_struct(), order_nr=config.ORDER_OBJECT.get_next())
     else:
         if config.TYPE_OF_VARIABLE_INDEXED_WITH_VARIABLE_TYPE == 'list':
-            predicted_struct = List.from_ast(ast, ctx.get_predicted_struct())
+            predicted_struct = List.from_ast(ast, ctx.get_predicted_struct(), order_nr=config.ORDER_OBJECT.get_next())
         elif config.TYPE_OF_VARIABLE_INDEXED_WITH_VARIABLE_TYPE == 'dictionary':
-            predicted_struct = Dictionary.from_ast(ast)
+            predicted_struct = Dictionary.from_ast(ast, order_nr=config.ORDER_OBJECT.get_next())
 
-    _, arg_struct = visit_expr(arg, Context(predicted_struct=Scalar.from_ast(arg)), macroses, config=config)
+    _, arg_struct = visit_expr(arg,
+                               Context(predicted_struct=Scalar.from_ast(arg, order_nr=config.ORDER_OBJECT.get_next())),
+                               macroses, config=config)
     rtype, struct = visit_expr(ast.node, Context(
         ctx=ctx,
         predicted_struct=predicted_struct), macroses, config=config)
@@ -273,10 +282,10 @@ def visit_test(ast, ctx, macroses=None, config=default_config):
     ctx.meet(Boolean(), ast)
     if ast.name in ('divisibleby', 'escaped', 'even', 'lower', 'odd', 'upper'):
         # TODO
-        predicted_struct = Scalar.from_ast(ast.node)
+        predicted_struct = Scalar.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
     elif ast.name in ('defined', 'undefined', 'equalto', 'iterable', 'mapping',
                       'none', 'number', 'sameas', 'sequence', 'string'):
-        predicted_struct = Unknown.from_ast(ast.node)
+        predicted_struct = Unknown.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
         if ast.name == 'defined':
             predicted_struct.checked_as_defined = True
         elif ast.name == 'undefined':
@@ -289,7 +298,9 @@ def visit_test(ast, ctx, macroses=None, config=default_config):
         if not ast.args:
             raise InvalidExpression(ast, 'divisibleby must have an argument')
         _, arg_struct = visit_expr(ast.args[0],
-                                   Context(predicted_struct=Number.from_ast(ast.args[0])), macroses, config=config)
+                                   Context(predicted_struct=Number.from_ast(ast.args[0],
+                                                                            order_nr=config.ORDER_OBJECT.get_next())),
+                                   macroses, config=config)
         struct = merge(arg_struct, struct)
     return rtype, struct
 
@@ -297,16 +308,18 @@ def visit_test(ast, ctx, macroses=None, config=default_config):
 @visits_expr(nodes.Concat)
 def visit_concat(ast, ctx, macroses=None, config=default_config):
     ctx.meet(Scalar(), ast)
-    return String.from_ast(ast), visit_many(ast.nodes, macroses, config, predicted_struct_cls=String)
+    return String.from_ast(ast, order_nr=config.ORDER_OBJECT.get_next()), visit_many(ast.nodes, macroses, config,
+                                                                                     predicted_struct_cls=String)
 
 
 @visits_expr(nodes.CondExpr)
 def visit_cond_expr(ast, ctx, macroses=None, config=default_config):
     if config.BOOLEAN_CONDITIONS:
-        test_predicted_struct = Boolean.from_ast(ast.test)
+        test_predicted_struct = Boolean.from_ast(ast.test, order_nr=config.ORDER_OBJECT.get_next())
     else:
-        test_predicted_struct = Unknown.from_ast(ast.test)
-    test_rtype, test_struct = visit_expr(ast.test, Context(predicted_struct=test_predicted_struct), macroses, config=config)
+        test_predicted_struct = Unknown.from_ast(ast.test, order_nr=config.ORDER_OBJECT.get_next())
+    test_rtype, test_struct = visit_expr(ast.test, Context(predicted_struct=test_predicted_struct), macroses,
+                                         config=config)
     if_rtype, if_struct = visit_expr(ast.expr1, ctx, macroses, config=config)
     else_rtype, else_struct = visit_expr(ast.expr2, ctx, macroses, config=config)
     struct = merge_many(if_struct, test_struct, else_struct)
@@ -358,7 +371,8 @@ def visit_call(ast, ctx, macroses=None, config=default_config):
             struct = Dictionary()
             for arg in ast.args:
                 arg_rtype, arg_struct = visit_expr(arg, Context(
-                    predicted_struct=Number.from_ast(arg)), macroses, config=config)
+                        predicted_struct=Number.from_ast(arg, order_nr=config.ORDER_OBJECT.get_next())), macroses,
+                                                   config=config)
                 struct = merge(struct, arg_struct)
             return List(Number()), struct
         elif ast.node.name == 'lipsum':
@@ -366,10 +380,14 @@ def visit_call(ast, ctx, macroses=None, config=default_config):
             struct = Dictionary()
             # probable TODO: set possible types for args and kwargs
             for arg in ast.args:
-                arg_rtype, arg_struct = visit_expr(arg, Context(predicted_struct=Scalar.from_ast(arg)), macroses, config=config)
+                arg_rtype, arg_struct = visit_expr(arg, Context(
+                    predicted_struct=Scalar.from_ast(arg, order_nr=config.ORDER_OBJECT.get_next())), macroses,
+                                                   config=config)
                 struct = merge(struct, arg_struct)
             for kwarg in ast.kwargs:
-                arg_rtype, arg_struct = visit_expr(kwarg.value, Context(predicted_struct=Scalar.from_ast(kwarg)), macroses, config=config)
+                arg_rtype, arg_struct = visit_expr(kwarg.value, Context(
+                    predicted_struct=Scalar.from_ast(kwarg, order_nr=config.ORDER_OBJECT.get_next())), macroses,
+                                                   config=config)
                 struct = merge(struct, arg_struct)
             return String(), struct
         elif ast.node.name == 'dict':
@@ -383,20 +401,28 @@ def visit_call(ast, ctx, macroses=None, config=default_config):
         if ast.node.attr in ('keys', 'iterkeys', 'values', 'itervalues'):
             ctx.meet(List(Unknown()), ast)
             rtype, struct = visit_expr(
-                ast.node.node, Context(predicted_struct=Dictionary.from_ast(ast.node.node)), macroses, config=config)
+                    ast.node.node, Context(
+                        predicted_struct=Dictionary.from_ast(ast.node.node, order_nr=config.ORDER_OBJECT.get_next())),
+                    macroses, config=config)
             return List(Unknown()), struct
         if ast.node.attr in ('startswith', 'endswith'):
             ctx.meet(Boolean(), ast)
             rtype, struct = visit_expr(
-                ast.node.node, Context(predicted_struct=String.from_ast(ast.node.node)), macroses, config=config)
+                    ast.node.node,
+                    Context(predicted_struct=String.from_ast(ast.node.node, order_nr=config.ORDER_OBJECT.get_next())),
+                    macroses, config=config)
             return Boolean(), struct
         if ast.node.attr == 'split':
             ctx.meet(List(String()), ast)
             rtype, struct = visit_expr(
-                ast.node.node, Context(predicted_struct=String.from_ast(ast.node.node)), macroses, config=config)
+                    ast.node.node,
+                    Context(predicted_struct=String.from_ast(ast.node.node, order_nr=config.ORDER_OBJECT.get_next())),
+                    macroses, config=config)
             if ast.args:
                 arg = ast.args[0]
-                _, arg_struct = visit_expr(arg, Context(predicted_struct=String.from_ast(arg)), macroses, config=config)
+                _, arg_struct = visit_expr(arg, Context(
+                    predicted_struct=String.from_ast(arg, order_nr=config.ORDER_OBJECT.get_next())), macroses,
+                                           config=config)
                 struct = merge(struct, arg_struct)
             return List(String()), struct
         raise InvalidExpression(ast, '"{0}" call is not supported'.format(ast.node.attr))
@@ -411,27 +437,27 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
                     'urlencode', 'urlize', 'wordcount', 'wordwrap', 'e'):
         ctx.meet(Scalar(), ast)
         if ast.name in ('abs', 'round'):
-            node_struct = Number.from_ast(ast.node)
+            node_struct = Number.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
             return_struct_cls = Number
         elif ast.name in ('float', 'int'):
-            node_struct = Scalar.from_ast(ast.node)
+            node_struct = Scalar.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
             return_struct_cls = Number
         elif ast.name in ('striptags', 'capitalize', 'center', 'escape', 'forceescape', 'format', 'indent',
                           'replace', 'safe', 'title', 'trim', 'truncate', 'upper', 'urlencode',
                           'urlize', 'wordwrap', 'e'):
-            node_struct = String.from_ast(ast.node)
+            node_struct = String.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
             return_struct_cls = String
         elif ast.name == 'filesizeformat':
-            node_struct = Number.from_ast(ast.node)
+            node_struct = Number.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
             return_struct_cls = String
         elif ast.name == 'string':
-            node_struct = Scalar.from_ast(ast.node)
+            node_struct = Scalar.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
             return_struct_cls = String
         elif ast.name == 'wordcount':
-            node_struct = String.from_ast(ast.node)
+            node_struct = String.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
             return_struct_cls = Number
         else:
-            node_struct = Scalar.from_ast(ast.node)
+            node_struct = Scalar.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
     elif ast.name in ('batch', 'slice'):
         ctx.meet(List(List(Unknown())), ast)
         rtype = List(List(Unknown(), linenos=[ast.node.lineno]), linenos=[ast.node.lineno])
@@ -444,25 +470,29 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
         return rtype, struct
     elif ast.name == 'default':
         default_value_rtype, default_value_struct = visit_expr(
-            ast.args[0], Context(predicted_struct=Unknown.from_ast(ast.args[0])), macroses, config=config)
+                ast.args[0],
+                Context(predicted_struct=Unknown.from_ast(ast.args[0], order_nr=config.ORDER_OBJECT.get_next())),
+                macroses, config=config)
         node_struct = merge(
-            ctx.get_predicted_struct(),
+                ctx.get_predicted_struct(),
             default_value_rtype,
         )
         node_struct.used_with_default = True
         node_struct.value = default_value_rtype.value
     elif ast.name == 'dictsort':
         ctx.meet(List(Tuple([Scalar(), Unknown()])), ast)
-        node_struct = Dictionary.from_ast(ast.node)
+        node_struct = Dictionary.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
     elif ast.name == 'join':
         ctx.meet(Scalar(), ast)
-        node_struct = List.from_ast(ast.node, String())
+        node_struct = List.from_ast(ast.node, String(), order_nr=config.ORDER_OBJECT.get_next())
         rtype, struct = visit_expr(ast.node, Context(
             return_struct_cls=String,
             predicted_struct=node_struct
         ), macroses, config=config)
         arg_rtype, arg_struct = visit_expr(ast.args[0],
-                                           Context(predicted_struct=String.from_ast(ast.args[0])), macroses, config=config)
+                                           Context(predicted_struct=String.from_ast(ast.args[0],
+                                                                                    order_nr=config.ORDER_OBJECT.get_next())),
+                                           macroses, config=config)
         return rtype, merge(struct, arg_struct)
     elif ast.name in ('first', 'last', 'random', 'length', 'sum'):
         if ast.name in ('first', 'last', 'random'):
@@ -474,7 +504,7 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
         else:
             ctx.meet(Scalar(), ast)
             el_struct = Scalar()
-        node_struct = List.from_ast(ast.node, el_struct)
+        node_struct = List.from_ast(ast.node, el_struct, order_nr=config.ORDER_OBJECT.get_next())
     elif ast.name in ('groupby', 'map', 'reject', 'rejectattr', 'select', 'selectattr', 'sort'):
         ctx.meet(List(Unknown()), ast)
         node_struct = merge(
@@ -484,7 +514,7 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
     elif ast.name == 'list':
         ctx.meet(List(Scalar()), ast)
         node_struct = merge(
-            List(Scalar.from_ast(ast.node)),
+            List(Scalar.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())),
             ctx.get_predicted_struct()
         ).item
     elif ast.name == 'pprint':
@@ -492,7 +522,7 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
         node_struct = ctx.get_predicted_struct()
     elif ast.name == 'xmlattr':
         ctx.meet(Scalar(), ast)
-        node_struct = Dictionary.from_ast(ast.node)
+        node_struct = Dictionary.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
     elif ast.name == 'attr':
         raise InvalidExpression(ast, 'attr filter is not supported')
     else:
@@ -516,13 +546,13 @@ def visit_template_data(ast, ctx, macroses=None, config=default_config):
 def visit_const(ast, ctx, macroses=None, config=default_config):
     ctx.meet(Scalar(), ast)
     if isinstance(ast.value, _compat.string_types):
-        rtype = String.from_ast(ast, constant=True)
+        rtype = String.from_ast(ast, constant=True, order_nr=config.ORDER_OBJECT.get_next())
     elif isinstance(ast.value, bool):
-        rtype = Boolean.from_ast(ast, constant=True)
+        rtype = Boolean.from_ast(ast, constant=True, order_nr=config.ORDER_OBJECT.get_next())
     elif isinstance(ast.value, (int, float, complex)):
-        rtype = Number.from_ast(ast, constant=True)
+        rtype = Number.from_ast(ast, constant=True, order_nr=config.ORDER_OBJECT.get_next())
     else:
-        rtype = Scalar.from_ast(ast, constant=True)
+        rtype = Scalar.from_ast(ast, constant=True, order_nr=config.ORDER_OBJECT.get_next())
     return rtype, Dictionary()
 
 
@@ -536,7 +566,7 @@ def visit_tuple(ast, ctx, macroses=None, config=default_config):
         item_rtype, item_struct = visit_expr(item, ctx, macroses, config=config)
         item_structs.append(item_rtype)
         struct = merge(struct, item_struct)
-    rtype = Tuple.from_ast(ast, item_structs, constant=True)
+    rtype = Tuple.from_ast(ast, item_structs, constant=True, order_nr=config.ORDER_OBJECT.get_next())
     return rtype, struct
 
 
@@ -554,7 +584,7 @@ def visit_list(ast, ctx, macroses=None, config=default_config):
             el_rtype = item_rtype
         else:
             el_rtype = merge_rtypes(el_rtype, item_rtype)
-    rtype = List.from_ast(ast, el_rtype or Unknown(), constant=True)
+    rtype = List.from_ast(ast, el_rtype or Unknown(), constant=True, order_nr=config.ORDER_OBJECT.get_next())
     return rtype, struct
 
 
