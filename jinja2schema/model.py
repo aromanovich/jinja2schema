@@ -85,7 +85,7 @@ class Variable(object):
         :param ast: AST node
         :type ast: :class:`jinja2.nodes.Node`
         """
-        for k, v in kwargs.items():
+        for k, v in list(kwargs.items()):
             if v is None:
                 del kwargs[k]
         kwargs = dict(cls._get_kwargs_from_ast(ast), **kwargs)
