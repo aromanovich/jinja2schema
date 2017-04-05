@@ -54,7 +54,8 @@ class Variable(object):
     """
     def __init__(self, label=None, linenos=None, constant=False,
                  may_be_defined=False, used_with_default=False,
-                 checked_as_undefined=False, checked_as_defined=False, value=None):
+                 checked_as_undefined=False, checked_as_defined=False,
+                 value=None, order_nr=None):
         self.label = label
         self.linenos = linenos if linenos is not None else []
         self.constant = constant
@@ -63,6 +64,7 @@ class Variable(object):
         self.checked_as_undefined = checked_as_undefined
         self.checked_as_defined = checked_as_defined
         self.value = value
+        self.order_nr = order_nr
 
     def clone(self):
         cls = type(self)
@@ -83,7 +85,7 @@ class Variable(object):
         :param ast: AST node
         :type ast: :class:`jinja2.nodes.Node`
         """
-        for k, v in kwargs.items():
+        for k, v in list(kwargs.items()):
             if v is None:
                 del kwargs[k]
         kwargs = dict(cls._get_kwargs_from_ast(ast), **kwargs)

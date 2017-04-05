@@ -428,3 +428,86 @@ def test_block_1():
         'y':  Scalar(label='y', linenos=[4]),
     })
     assert struct == expected_struct
+
+
+def test_order_number_setting_1():
+    config = Config(ORDER_NUMBER=True)
+
+    template = '''
+    {{ x }}
+    {{ y }}
+    {{ z }}
+    {{ x }}
+    {{ x }}
+    '''
+    struct = infer(template, config)
+    assert struct['x'].order_nr < struct['y'].order_nr
+    assert struct['y'].order_nr < struct['z'].order_nr
+
+
+def test_order_number_setting_1_5():
+    config = Config(ORDER_NUMBER=True)
+
+    template = '''
+    {% if yy %}
+    {{ intooo }}
+    {{ zz }}
+    {% endif %}
+    '''
+    struct = infer(template, config)
+    assert struct['yy'].order_nr < struct['zz'].order_nr
+
+
+def test_order_number_setting_2():
+    config = Config(ORDER_NUMBER=True)
+
+    template = '''
+    {% for n in nx %}
+    {{ y }}
+    {{ z }}
+    {% endfor %}
+    {% if yy %}
+    {{ zz }}
+    {{ xx }}
+    {% endif %}
+    '''
+    struct = infer(template, config)
+    assert struct['y'].order_nr < struct['z'].order_nr
+    assert struct['nx'].order_nr < struct['yy'].order_nr
+    assert struct['zz'].order_nr < struct['xx'].order_nr
+
+
+def test_order_number_setting_3():
+    config = Config(ORDER_NUMBER=True)
+
+    template = '''
+    {% for a in aa %}
+    {{ ax }}
+    {% for b in bb %}
+    {{ bx }}
+    {% for c in cc %}
+    {{ cx }}
+    {% endfor %}
+    {% endfor %}
+    {% endfor %}
+    '''
+    struct = infer(template, config)
+    assert struct['ax'].order_nr == struct['bx'].order_nr == struct['cx'].order_nr
+
+
+def test_order_number_setting_4():
+    config = Config(ORDER_NUMBER=True, ORDER_NUMBER_SUB_COUNTER=False)
+
+    template = '''
+    {% for a in aa %}
+    {{ ax }}
+    {% for b in bb %}
+    {{ bx }}
+    {% for c in cc %}
+    {{ cx }}
+    {% endfor %}
+    {% endfor %}
+    {% endfor %}
+    '''
+    struct = infer(template, config)
+    assert struct['ax'].order_nr != struct['bx'].order_nr != struct['cx'].order_nr
