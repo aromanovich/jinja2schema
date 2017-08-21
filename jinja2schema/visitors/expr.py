@@ -280,7 +280,7 @@ def visit_getitem(ast, ctx, macroses=None, config=default_config):
 @visits_expr(nodes.Test)
 def visit_test(ast, ctx, macroses=None, config=default_config):
     ctx.meet(Boolean(), ast)
-    if ast.name in ('divisibleby', 'escaped', 'even', 'lower', 'odd', 'upper', 'match'):
+    if ast.name in ('divisibleby', 'escaped', 'even', 'lower', 'odd', 'upper'):
         # TODO
         predicted_struct = Scalar.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
     elif ast.name in ('defined', 'undefined', 'equalto', 'iterable', 'mapping',
@@ -434,7 +434,7 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
     if ast.name in ('abs', 'striptags', 'capitalize', 'center', 'escape', 'filesizeformat',
                     'float', 'forceescape', 'format', 'indent', 'int', 'replace', 'round',
                     'safe', 'string', 'striptags', 'title', 'trim', 'truncate', 'upper',
-                    'urlencode', 'urlize', 'wordcount', 'wordwrap', 'e', 'regex_replace'):
+                    'urlencode', 'urlize', 'wordcount', 'wordwrap', 'e', 'regex_replace', 'match'):
         ctx.meet(Scalar(), ast)
         if ast.name in ('abs', 'round'):
             node_struct = Number.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
@@ -444,7 +444,7 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
             return_struct_cls = Number
         elif ast.name in ('striptags', 'capitalize', 'center', 'escape', 'forceescape', 'format', 'indent',
                           'replace', 'safe', 'title', 'trim', 'truncate', 'upper', 'urlencode',
-                          'urlize', 'wordwrap', 'e', 'regex_replace'):
+                          'urlize', 'wordwrap', 'e', 'regex_replace', 'match'):
             node_struct = String.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
             return_struct_cls = String
         elif ast.name == 'filesizeformat':
