@@ -526,7 +526,7 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
     elif ast.name == 'attr':
         raise InvalidExpression(ast, 'attr filter is not supported')
     else:
-        raise InvalidExpression(ast, 'unknown filter')
+        raise InvalidExpression(ast, 'unknown filter "{0}"'.format(ast.name))
     rv = visit_expr(ast.node, Context(
         ctx=ctx,
         return_struct_cls=return_struct_cls,
