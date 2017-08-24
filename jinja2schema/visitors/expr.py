@@ -434,7 +434,7 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
     if ast.name in ('abs', 'striptags', 'capitalize', 'center', 'escape', 'filesizeformat',
                     'float', 'forceescape', 'format', 'indent', 'int', 'replace', 'round',
                     'safe', 'string', 'striptags', 'title', 'trim', 'truncate', 'upper',
-                    'urlencode', 'urlize', 'wordcount', 'wordwrap', 'e'):
+                    'urlencode', 'urlize', 'wordcount', 'wordwrap', 'e', 'regex_replace', 'match', 'quote'):
         ctx.meet(Scalar(), ast)
         if ast.name in ('abs', 'round'):
             node_struct = Number.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
@@ -444,7 +444,7 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
             return_struct_cls = Number
         elif ast.name in ('striptags', 'capitalize', 'center', 'escape', 'forceescape', 'format', 'indent',
                           'replace', 'safe', 'title', 'trim', 'truncate', 'upper', 'urlencode',
-                          'urlize', 'wordwrap', 'e'):
+                          'urlize', 'wordwrap', 'e', 'regex_replace', 'match', 'quote'):
             node_struct = String.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
             return_struct_cls = String
         elif ast.name == 'filesizeformat':
@@ -526,7 +526,7 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
     elif ast.name == 'attr':
         raise InvalidExpression(ast, 'attr filter is not supported')
     else:
-        raise InvalidExpression(ast, 'unknown filter')
+        raise InvalidExpression(ast, 'unknown filter "{0}"'.format(ast.name))
     rv = visit_expr(ast.node, Context(
         ctx=ctx,
         return_struct_cls=return_struct_cls,
