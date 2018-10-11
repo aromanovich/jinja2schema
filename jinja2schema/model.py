@@ -202,6 +202,9 @@ class List(Variable):
     def __repr__(self):
         return pprint.pformat([self.item])
 
+    def __iter__(self):
+        return ListIterator(self.item) # makes .model.List an iterable so it can be used like a native list
+
     def clone(self):
         rv = super(List, self).clone()
         rv.item = self.item.clone()
@@ -212,6 +215,17 @@ class List(Variable):
         kwargs = dict(cls._get_kwargs_from_ast(ast), **kwargs)
         return cls(item, **kwargs)
 
+class ListIterator:
+    def __init__(self,item):
+        self.item = item
+        self.visitedYet = False # Only has one entry, so no need to use an index
+    
+    def __next__(self):
+        if not self.visitedYet:
+            self.visitedYet = True
+            return self.item
+        else:
+            raise StopIteration
 
 class Tuple(Variable):
     """A tuple.
