@@ -71,6 +71,9 @@ def merge(fst, snd, custom_merger=None):
     result.used_with_default = fst.used_with_default and snd.used_with_default
     result.checked_as_defined = fst.checked_as_defined and snd.checked_as_defined
     result.checked_as_undefined = fst.checked_as_undefined and snd.checked_as_undefined
+    if fst.value == snd.value:
+        result.value = fst.value
+    result.order_nr = fst.order_nr
     if callable(custom_merger):
         result = custom_merger(fst, snd, result)
     return result

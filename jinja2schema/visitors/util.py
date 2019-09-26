@@ -13,7 +13,8 @@ def visit(node, macroses, config, predicted_struct_cls=Scalar, return_struct_cls
     if isinstance(node, jinja2.nodes.Stmt):
         structure = visit_stmt(node, macroses, config)
     elif isinstance(node, jinja2.nodes.Expr):
-        ctx = Context(predicted_struct=predicted_struct_cls.from_ast(node), return_struct_cls=return_struct_cls)
+        ctx = Context(predicted_struct=predicted_struct_cls.from_ast(node, order_nr=config.ORDER_OBJECT.get_next()),
+                      return_struct_cls=return_struct_cls)
         _, structure = visit_expr(node, ctx, macroses, config)
     elif isinstance(node, jinja2.nodes.Template):
         structure = visit_many(node.body, macroses, config)
@@ -30,11 +31,14 @@ def visit_many(nodes, macroses, config, predicted_struct_cls=Scalar, return_stru
     """
     rv = Dictionary()
     for node in nodes:
-        structure = visit(node, macroses, config, predicted_struct_cls=predicted_struct_cls, return_struct_cls=return_struct_cls)
+        if isinstance(node, jinja2.nodes.Extends):
+            structure = visit_extends(node, macroses, config, [x for x in nodes if isinstance(x, jinja2.nodes.Block)])
+        else:
+            structure = visit(node, macroses, config, predicted_struct_cls, return_struct_cls)
         rv = merge(rv, structure)
     return rv
 
 
 # keep these at the end of file to avoid circular imports
 from .expr import Context, visit_expr
-from .stmt import visit_stmt
+from .stmt import visit_stmt, visit_extends

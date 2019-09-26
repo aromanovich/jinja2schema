@@ -186,7 +186,7 @@ def test_slice():
 
 
 def test_test_1():
-    template = '''{{ x is divisibleby data.field }}'''
+    template = '''{{ x is divisibleby (data.field) }}'''
     ast = parse(template).find(nodes.Test)
     rtype, struct = visit_test(ast, get_scalar_context(ast))
 
@@ -238,4 +238,4 @@ def test_const():
     template = '''{{ false }}'''
     const_ast = parse(template).find(nodes.Const)
     rtype, struct = visit_const(const_ast, get_scalar_context(const_ast))
-    assert rtype == Boolean(constant=True, linenos=[1])
+    assert rtype == Boolean(constant=True, linenos=[1], value=False)
