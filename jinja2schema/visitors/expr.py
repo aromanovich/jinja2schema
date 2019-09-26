@@ -137,7 +137,6 @@ def visits_expr(node_cls):
         return wrapped_func
     return decorator
 
-
 def visit_expr(ast, ctx, macroses=None, config=default_config):
     """Returns a structure of ``ast``.
 
@@ -398,7 +397,9 @@ def visit_call(ast, ctx, macroses=None, config=default_config):
         else:
             raise InvalidExpression(ast, '"{0}" call is not supported'.format(ast.node.name))
     elif isinstance(ast.node, nodes.Getattr):
-        if ast.node.attr in ('keys', 'iterkeys', 'values', 'itervalues'):
+        if ast.node.node.name in ('loop'):
+            return Unknown(), Unknown()
+        elif ast.node.attr in ('keys', 'iterkeys', 'values', 'itervalues'):
             ctx.meet(List(Unknown()), ast)
             rtype, struct = visit_expr(
                     ast.node.node, Context(
