@@ -137,7 +137,6 @@ def visits_expr(node_cls):
         return wrapped_func
     return decorator
 
-
 def visit_expr(ast, ctx, macroses=None, config=default_config):
     """Returns a structure of ``ast``.
 
@@ -155,6 +154,11 @@ def visit_expr(ast, ctx, macroses=None, config=default_config):
         raise Exception('expression visitor for {0} is not found'.format(type(ast)))
     return visitor(ast, ctx, macroses, config=config)
 
+@visits_expr(nodes.Call)
+def visit_call(ast, ctx, macroses=None, config=default_config):
+    # my code to short circuit evaluating the node
+    if ast.node.node.name in ('loop'):
+        return Unknown(), Unknown()
 
 def _visit_dict(ast, ctx, macroses, items, config=default_config):
     """A common logic behind nodes.Dict and nodes.Call (``{{ dict(a=1) }}``)
