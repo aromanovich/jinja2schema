@@ -434,7 +434,7 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
     if ast.name in ('abs', 'striptags', 'capitalize', 'center', 'escape', 'filesizeformat',
                     'float', 'forceescape', 'format', 'indent', 'int', 'replace', 'round',
                     'safe', 'string', 'striptags', 'title', 'trim', 'truncate', 'upper',
-                    'urlencode', 'urlize', 'wordcount', 'wordwrap', 'e'):
+                    'urlencode', 'urlize', 'wordcount', 'wordwrap', 'e', 'lower'):
         ctx.meet(Scalar(), ast)
         if ast.name in ('abs', 'round'):
             node_struct = Number.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
@@ -444,7 +444,7 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
             return_struct_cls = Number
         elif ast.name in ('striptags', 'capitalize', 'center', 'escape', 'forceescape', 'format', 'indent',
                           'replace', 'safe', 'title', 'trim', 'truncate', 'upper', 'urlencode',
-                          'urlize', 'wordwrap', 'e'):
+                          'urlize', 'wordwrap', 'e', 'lower'):
             node_struct = String.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
             return_struct_cls = String
         elif ast.name == 'filesizeformat':
@@ -494,8 +494,8 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
                                                                                     order_nr=config.ORDER_OBJECT.get_next())),
                                            macroses, config=config)
         return rtype, merge(struct, arg_struct)
-    elif ast.name in ('first', 'last', 'random', 'length', 'sum'):
-        if ast.name in ('first', 'last', 'random'):
+    elif ast.name in ('first', 'last', 'random', 'length', 'sum', 'max', 'min'):
+        if ast.name in ('first', 'last', 'random', 'max', 'min'):
             el_struct = ctx.get_predicted_struct()
         elif ast.name == 'length':
             ctx.meet(Scalar(), ast)
