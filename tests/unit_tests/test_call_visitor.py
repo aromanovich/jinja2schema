@@ -92,6 +92,33 @@ def test_str_method_calls():
     assert struct == expected_struct
 
 
+def test_cycle_without_variables_returns_empty_structure():
+    template = "{{ loop.cycle('odd', 'even') }}"
+    call_ast = parse(template).find(nodes.Call)
+    ctx = Context(return_struct_cls=Unknown, predicted_struct=Unknown.from_ast(call_ast))
+    rtype, struct = visit_call(call_ast, ctx)
+
+    expected_rtype = List(String())
+    assert rtype == expected_rtype
+    expected_struct = Dictionary({})
+    assert struct == expected_struct
+
+
+def test_cycle_with_variables():
+    template = '{{ loop.cycle(odd, even) }}'
+    call_ast = parse(template).find(nodes.Call)
+    ctx = Context(return_struct_cls=Unknown, predicted_struct=Unknown.from_ast(call_ast))
+    rtype, struct = visit_call(call_ast, ctx)
+
+    expected_rtype = List(String())
+    assert rtype == expected_rtype
+
+    expected_struct = Dictionary({
+        'even': String(label='even', constant=False, linenos=[1]),
+        'odd': String(label='odd', constant=False, linenos=[1])
+    })
+    assert struct == expected_struct
+
 
 def test_raise_on_unknown_call():
     for template in ('{{ x.some_unknown_f() }}', '{{ xxx() }}'):
