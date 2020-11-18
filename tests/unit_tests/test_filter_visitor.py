@@ -51,14 +51,16 @@ def test_batch_and_slice_filters():
 
 
 def test_default_filter():
-    template = '''{{ x|default('g') }}'''
-    ast = parse(template).find(nodes.Filter)
-    rtype, struct = visit_filter(ast, get_scalar_context(ast))
+    for filter in ('d', 'default'):
+        template = '''{{ x|''' + filter + '''('g') }}'''
 
-    expected_struct = Dictionary({
-        'x': String(label='x', linenos=[1], used_with_default=True, value='g'),
-    })
-    assert struct == expected_struct
+        ast = parse(template).find(nodes.Filter)
+        rtype, struct = visit_filter(ast, get_scalar_context(ast))
+
+        expected_struct = Dictionary({
+            'x': String(label='x', linenos=[1], used_with_default=True, value='g'),
+        })
+        assert struct == expected_struct
 
 
 def test_filter_chaining():
@@ -140,12 +142,15 @@ def test_join_filter():
 
 
 def test_length_filter():
-    ast = parse('{{ xs|length }}').find(nodes.Filter)
-    rtype, struct = visit_filter(ast, get_scalar_context(ast))
-    assert rtype == Number(label='xs', linenos=[1])
-    assert struct == Dictionary({
-        'xs': List(Unknown(), label='xs', linenos=[1]),
-    })
+    for filter in ('count', 'length'):
+        template = '{{ xs|' + filter + ' }}'
+
+        ast = parse(template).find(nodes.Filter)
+        rtype, struct = visit_filter(ast, get_scalar_context(ast))
+        assert rtype == Number(label='xs', linenos=[1])
+        assert struct == Dictionary({
+            'xs': List(Unknown(), label='xs', linenos=[1]),
+        })
 
 def test_max_min_filter():
     for filter in ('max', 'min'):

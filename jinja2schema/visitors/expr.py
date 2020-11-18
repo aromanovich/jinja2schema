@@ -468,7 +468,7 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
             predicted_struct=node_struct
         ), macroses, config=config)
         return rtype, struct
-    elif ast.name == 'default':
+    elif ast.name in ('d', 'default'):
         default_value_rtype, default_value_struct = visit_expr(
                 ast.args[0],
                 Context(predicted_struct=Unknown.from_ast(ast.args[0], order_nr=config.ORDER_OBJECT.get_next())),
@@ -494,10 +494,10 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
                                                                                     order_nr=config.ORDER_OBJECT.get_next())),
                                            macroses, config=config)
         return rtype, merge(struct, arg_struct)
-    elif ast.name in ('first', 'last', 'length', 'max', 'min', 'random', 'sum'):
+    elif ast.name in ('count', 'first', 'last', 'length', 'max', 'min', 'random', 'sum'):
         if ast.name in ('first', 'last', 'max', 'min', 'random'):
             el_struct = ctx.get_predicted_struct()
-        elif ast.name == 'length':
+        elif ast.name in ('count', 'length'):
             ctx.meet(Scalar(), ast)
             return_struct_cls = Number
             el_struct = Unknown()
