@@ -11,7 +11,7 @@ def get_scalar_context(ast):
 
 
 def test_string_filters():
-    for filter in ('capitalize', 'striptags', 'title', 'upper', 'urlize'):
+    for filter in ('capitalize', 'lower', 'striptags', 'title', 'upper', 'urlize'):
         template = '{{ x|' + filter + ' }}'
         ast = parse(template).find(nodes.Filter)
 

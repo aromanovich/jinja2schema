@@ -432,7 +432,7 @@ def visit_call(ast, ctx, macroses=None, config=default_config):
 def visit_filter(ast, ctx, macroses=None, config=default_config):
     return_struct_cls = None
     if ast.name in ('abs', 'capitalize', 'center', 'e', 'escape', 'filesizeformat', 'float', 'forceescape',
-                    'format', 'indent', 'int', 'replace', 'round', 'safe', 'string', 'striptags',
+                    'format', 'indent', 'int', 'lower', 'replace', 'round', 'safe', 'string', 'striptags',
                     'striptags', 'title', 'trim', 'truncate', 'upper', 'urlencode', 'urlize',
                     'wordcount', 'wordwrap'):
         ctx.meet(Scalar(), ast)
@@ -443,8 +443,8 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
             node_struct = Scalar.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
             return_struct_cls = Number
         elif ast.name in ('capitalize', 'center', 'e', 'escape', 'forceescape', 'format', 'indent',
-                          'replace', 'safe', 'striptags', 'title', 'trim', 'truncate', 'upper',
-                          'urlencode', 'urlize', 'wordwrap'):
+                          'lower', 'replace', 'safe', 'striptags', 'title', 'trim', 'truncate',
+                          'upper', 'urlencode', 'urlize', 'wordwrap'):
             node_struct = String.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
             return_struct_cls = String
         elif ast.name == 'filesizeformat':
