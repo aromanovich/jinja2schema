@@ -146,3 +146,14 @@ def test_length_filter():
     assert struct == Dictionary({
         'xs': List(Unknown(), label='xs', linenos=[1]),
     })
+
+def test_max_min_filter():
+    for filter in ('max', 'min'):
+        template = '{{ values|' + filter + ' }}'
+        ast = parse(template).find(nodes.Filter)
+
+        rtype, struct = visit_filter(ast, get_scalar_context(ast))
+        assert rtype == Scalar(label='values', linenos=[1])
+        assert struct == Dictionary({
+            'values': List(Scalar(linenos=[1]), label='values', linenos=[1]),
+        })

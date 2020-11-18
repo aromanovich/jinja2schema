@@ -494,8 +494,8 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
                                                                                     order_nr=config.ORDER_OBJECT.get_next())),
                                            macroses, config=config)
         return rtype, merge(struct, arg_struct)
-    elif ast.name in ('first', 'last', 'length', 'random', 'sum'):
-        if ast.name in ('first', 'last', 'random'):
+    elif ast.name in ('first', 'last', 'length', 'max', 'min', 'random', 'sum'):
+        if ast.name in ('first', 'last', 'max', 'min', 'random'):
             el_struct = ctx.get_predicted_struct()
         elif ast.name == 'length':
             ctx.meet(Scalar(), ast)
