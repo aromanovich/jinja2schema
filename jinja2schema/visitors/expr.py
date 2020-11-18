@@ -505,7 +505,7 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
             ctx.meet(Scalar(), ast)
             el_struct = Scalar()
         node_struct = List.from_ast(ast.node, el_struct, order_nr=config.ORDER_OBJECT.get_next())
-    elif ast.name in ('groupby', 'map', 'reject', 'rejectattr', 'select', 'selectattr', 'sort'):
+    elif ast.name in ('groupby', 'map', 'reject', 'rejectattr', 'select', 'selectattr', 'sort', 'unique'):
         ctx.meet(List(Unknown()), ast)
         node_struct = merge(
             List(Unknown()),

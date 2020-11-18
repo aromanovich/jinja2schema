@@ -157,3 +157,14 @@ def test_max_min_filter():
         assert struct == Dictionary({
             'values': List(Scalar(linenos=[1]), label='values', linenos=[1]),
         })
+
+def test_unique_filter():
+    template = '{{ values|unique }}'
+    ast = parse(template).find(nodes.Filter)
+
+    unknown_ctx = Context(predicted_struct=Unknown.from_ast(ast))
+    rtype, struct = visit_filter(ast, unknown_ctx)
+    assert rtype == Unknown(label='values', linenos=[1])
+    assert struct == Dictionary({
+        'values': List(Unknown(), label='values', linenos=[1]),
+    })
