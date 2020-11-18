@@ -177,3 +177,22 @@ def test_if_2():
         'z': Unknown(label='z', linenos=[2, 4]),
     })
     assert struct == expected_struct
+
+def test_elif():
+    template = '''
+    {% if kenny.sick %}
+    Kenny is sick.
+    {% elif kenny.dead %}
+    You killed Kenny!  You bastard!!!
+    {% else %}
+    Kenny looks okay --- so far
+    {% endif %}
+    '''
+    struct = infer_from_ast(parse(template))
+    expected_struct = Dictionary({
+        'kenny': Dictionary({
+            'sick': Unknown(label='sick', linenos=[2]),
+            'dead': Unknown(label='dead', linenos=[4]),
+        },label='kenny', linenos=[2, 4]),
+    })
+    assert struct == expected_struct

@@ -94,8 +94,9 @@ def visit_if(ast, macroses=None, config=default_config, child_blocks=None):
     test_rtype, test_struct = visit_expr(
             ast.test, Context(predicted_struct=test_predicted_struct), macroses, config)
     if_struct = visit_many(ast.body, macroses, config, predicted_struct_cls=Scalar)
+    elif_struct = visit_many(ast.elif_, macroses, config, predicted_struct_cls=Scalar)
     else_struct = visit_many(ast.else_, macroses, config, predicted_struct_cls=Scalar) if ast.else_ else Dictionary()
-    struct = merge_many(test_struct, if_struct, else_struct)
+    struct = merge_many(test_struct, if_struct, elif_struct, else_struct)
 
     for var_name, var_struct in iteritems(test_struct):
         if var_struct.checked_as_defined or var_struct.checked_as_undefined:
