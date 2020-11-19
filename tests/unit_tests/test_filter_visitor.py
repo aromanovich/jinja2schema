@@ -185,3 +185,15 @@ def test_reverse_filter():
         'x': Unknown(label='x', linenos=[1]),
     })
     assert struct == expected_struct
+
+def test_tojson_filter():
+    template = '{{ x|tojson }}'
+
+    ast = parse(template).find(nodes.Filter)
+    rtype, struct = visit_filter(ast, get_scalar_context(ast))
+
+    assert rtype == String(label='x', linenos=[1])
+    expected_struct = Dictionary({
+        'x': Unknown(label='x', linenos=[1]),
+    })
+    assert struct == expected_struct

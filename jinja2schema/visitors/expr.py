@@ -523,6 +523,9 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
     elif ast.name == 'reverse':
         node_struct = Unknown.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
         return_struct_cls = Unknown
+    elif ast.name == 'tojson':
+        node_struct = Unknown.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
+        return_struct_cls = String
     elif ast.name == 'xmlattr':
         ctx.meet(Scalar(), ast)
         node_struct = Dictionary.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
