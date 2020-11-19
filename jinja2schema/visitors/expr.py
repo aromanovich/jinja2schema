@@ -520,6 +520,9 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
     elif ast.name == 'pprint':
         ctx.meet(Scalar(), ast)
         node_struct = ctx.get_predicted_struct()
+    elif ast.name == 'reverse':
+        node_struct = Unknown.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
+        return_struct_cls = Unknown
     elif ast.name == 'xmlattr':
         ctx.meet(Scalar(), ast)
         node_struct = Dictionary.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())

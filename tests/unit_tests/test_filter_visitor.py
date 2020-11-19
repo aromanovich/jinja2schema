@@ -173,3 +173,15 @@ def test_unique_filter():
     assert struct == Dictionary({
         'values': List(Unknown(), label='values', linenos=[1]),
     })
+
+def test_reverse_filter():
+    template = '{{ x|reverse }}'
+
+    ast = parse(template).find(nodes.Filter)
+    rtype, struct = visit_filter(ast, get_scalar_context(ast))
+
+    assert rtype == Unknown(label='x', linenos=[1])
+    expected_struct = Dictionary({
+        'x': Unknown(label='x', linenos=[1]),
+    })
+    assert struct == expected_struct
