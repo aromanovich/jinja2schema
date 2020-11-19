@@ -283,8 +283,8 @@ def visit_test(ast, ctx, macroses=None, config=default_config):
     if ast.name in ('divisibleby', 'escaped', 'even', 'lower', 'odd', 'upper'):
         # TODO
         predicted_struct = Scalar.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
-    elif ast.name in ('defined', 'undefined', 'equalto', 'iterable', 'mapping',
-                      'none', 'number', 'sameas', 'sequence', 'string'):
+    elif ast.name in ('defined', 'equalto', 'iterable', 'mapping', 'none', 'number', 'sameas',
+                      'sequence', 'string', 'undefined'):
         predicted_struct = Unknown.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
         if ast.name == 'defined':
             predicted_struct.checked_as_defined = True
@@ -431,10 +431,10 @@ def visit_call(ast, ctx, macroses=None, config=default_config):
 @visits_expr(nodes.Filter)
 def visit_filter(ast, ctx, macroses=None, config=default_config):
     return_struct_cls = None
-    if ast.name in ('abs', 'striptags', 'capitalize', 'center', 'escape', 'filesizeformat',
-                    'float', 'forceescape', 'format', 'indent', 'int', 'replace', 'round',
-                    'safe', 'string', 'striptags', 'title', 'trim', 'truncate', 'upper',
-                    'urlencode', 'urlize', 'wordcount', 'wordwrap', 'e'):
+    if ast.name in ('abs', 'capitalize', 'center', 'e', 'escape', 'filesizeformat', 'float', 'forceescape',
+                    'format', 'indent', 'int', 'lower', 'replace', 'round', 'safe', 'string', 'striptags',
+                    'striptags', 'title', 'trim', 'truncate', 'upper', 'urlencode', 'urlize',
+                    'wordcount', 'wordwrap'):
         ctx.meet(Scalar(), ast)
         if ast.name in ('abs', 'round'):
             node_struct = Number.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
@@ -442,9 +442,9 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
         elif ast.name in ('float', 'int'):
             node_struct = Scalar.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
             return_struct_cls = Number
-        elif ast.name in ('striptags', 'capitalize', 'center', 'escape', 'forceescape', 'format', 'indent',
-                          'replace', 'safe', 'title', 'trim', 'truncate', 'upper', 'urlencode',
-                          'urlize', 'wordwrap', 'e'):
+        elif ast.name in ('capitalize', 'center', 'e', 'escape', 'forceescape', 'format', 'indent',
+                          'lower', 'replace', 'safe', 'striptags', 'title', 'trim', 'truncate',
+                          'upper', 'urlencode', 'urlize', 'wordwrap'):
             node_struct = String.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
             return_struct_cls = String
         elif ast.name == 'filesizeformat':
@@ -468,7 +468,7 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
             predicted_struct=node_struct
         ), macroses, config=config)
         return rtype, struct
-    elif ast.name == 'default':
+    elif ast.name in ('d', 'default'):
         default_value_rtype, default_value_struct = visit_expr(
                 ast.args[0],
                 Context(predicted_struct=Unknown.from_ast(ast.args[0], order_nr=config.ORDER_OBJECT.get_next())),
@@ -494,10 +494,10 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
                                                                                     order_nr=config.ORDER_OBJECT.get_next())),
                                            macroses, config=config)
         return rtype, merge(struct, arg_struct)
-    elif ast.name in ('first', 'last', 'random', 'length', 'sum'):
-        if ast.name in ('first', 'last', 'random'):
+    elif ast.name in ('count', 'first', 'last', 'length', 'max', 'min', 'random', 'sum'):
+        if ast.name in ('first', 'last', 'max', 'min', 'random'):
             el_struct = ctx.get_predicted_struct()
-        elif ast.name == 'length':
+        elif ast.name in ('count', 'length'):
             ctx.meet(Scalar(), ast)
             return_struct_cls = Number
             el_struct = Unknown()
@@ -505,7 +505,7 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
             ctx.meet(Scalar(), ast)
             el_struct = Scalar()
         node_struct = List.from_ast(ast.node, el_struct, order_nr=config.ORDER_OBJECT.get_next())
-    elif ast.name in ('groupby', 'map', 'reject', 'rejectattr', 'select', 'selectattr', 'sort'):
+    elif ast.name in ('groupby', 'map', 'reject', 'rejectattr', 'select', 'selectattr', 'sort', 'unique'):
         ctx.meet(List(Unknown()), ast)
         node_struct = merge(
             List(Unknown()),
@@ -520,6 +520,12 @@ def visit_filter(ast, ctx, macroses=None, config=default_config):
     elif ast.name == 'pprint':
         ctx.meet(Scalar(), ast)
         node_struct = ctx.get_predicted_struct()
+    elif ast.name == 'reverse':
+        node_struct = Unknown.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
+        return_struct_cls = Unknown
+    elif ast.name == 'tojson':
+        node_struct = Unknown.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())
+        return_struct_cls = String
     elif ast.name == 'xmlattr':
         ctx.meet(Scalar(), ast)
         node_struct = Dictionary.from_ast(ast.node, order_nr=config.ORDER_OBJECT.get_next())

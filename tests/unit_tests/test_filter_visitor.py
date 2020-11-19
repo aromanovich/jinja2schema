@@ -11,7 +11,7 @@ def get_scalar_context(ast):
 
 
 def test_string_filters():
-    for filter in ('striptags', 'capitalize', 'title', 'upper', 'urlize'):
+    for filter in ('capitalize', 'lower', 'striptags', 'title', 'upper', 'urlize'):
         template = '{{ x|' + filter + ' }}'
         ast = parse(template).find(nodes.Filter)
 
@@ -51,14 +51,16 @@ def test_batch_and_slice_filters():
 
 
 def test_default_filter():
-    template = '''{{ x|default('g') }}'''
-    ast = parse(template).find(nodes.Filter)
-    rtype, struct = visit_filter(ast, get_scalar_context(ast))
+    for filter in ('d', 'default'):
+        template = '''{{ x|''' + filter + '''('g') }}'''
 
-    expected_struct = Dictionary({
-        'x': String(label='x', linenos=[1], used_with_default=True, value='g'),
-    })
-    assert struct == expected_struct
+        ast = parse(template).find(nodes.Filter)
+        rtype, struct = visit_filter(ast, get_scalar_context(ast))
+
+        expected_struct = Dictionary({
+            'x': String(label='x', linenos=[1], used_with_default=True, value='g'),
+        })
+        assert struct == expected_struct
 
 
 def test_filter_chaining():
@@ -140,9 +142,58 @@ def test_join_filter():
 
 
 def test_length_filter():
-    ast = parse('{{ xs|length }}').find(nodes.Filter)
-    rtype, struct = visit_filter(ast, get_scalar_context(ast))
-    assert rtype == Number(label='xs', linenos=[1])
+    for filter in ('count', 'length'):
+        template = '{{ xs|' + filter + ' }}'
+
+        ast = parse(template).find(nodes.Filter)
+        rtype, struct = visit_filter(ast, get_scalar_context(ast))
+        assert rtype == Number(label='xs', linenos=[1])
+        assert struct == Dictionary({
+            'xs': List(Unknown(), label='xs', linenos=[1]),
+        })
+
+def test_max_min_filter():
+    for filter in ('max', 'min'):
+        template = '{{ values|' + filter + ' }}'
+        ast = parse(template).find(nodes.Filter)
+
+        rtype, struct = visit_filter(ast, get_scalar_context(ast))
+        assert rtype == Scalar(label='values', linenos=[1])
+        assert struct == Dictionary({
+            'values': List(Scalar(linenos=[1]), label='values', linenos=[1]),
+        })
+
+def test_unique_filter():
+    template = '{{ values|unique }}'
+    ast = parse(template).find(nodes.Filter)
+
+    unknown_ctx = Context(predicted_struct=Unknown.from_ast(ast))
+    rtype, struct = visit_filter(ast, unknown_ctx)
+    assert rtype == Unknown(label='values', linenos=[1])
     assert struct == Dictionary({
-        'xs': List(Unknown(), label='xs', linenos=[1]),
+        'values': List(Unknown(), label='values', linenos=[1]),
     })
+
+def test_reverse_filter():
+    template = '{{ x|reverse }}'
+
+    ast = parse(template).find(nodes.Filter)
+    rtype, struct = visit_filter(ast, get_scalar_context(ast))
+
+    assert rtype == Unknown(label='x', linenos=[1])
+    expected_struct = Dictionary({
+        'x': Unknown(label='x', linenos=[1]),
+    })
+    assert struct == expected_struct
+
+def test_tojson_filter():
+    template = '{{ x|tojson }}'
+
+    ast = parse(template).find(nodes.Filter)
+    rtype, struct = visit_filter(ast, get_scalar_context(ast))
+
+    assert rtype == String(label='x', linenos=[1])
+    expected_struct = Dictionary({
+        'x': Unknown(label='x', linenos=[1]),
+    })
+    assert struct == expected_struct

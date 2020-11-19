@@ -35,7 +35,7 @@ setup(
     author_email='anthony.romanovich@gmail.com',
     url='https://jinja2schema.readthedocs.io',
     packages=find_packages(exclude=['tests']),
-    install_requires=['Jinja2>=2.2'],
+    install_requires=['Jinja2>=2.10'],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
