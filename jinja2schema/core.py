@@ -157,7 +157,7 @@ def to_json_schema(var, jsonschema_encoder=JSONSchemaDraft4Encoder):
     """
     return jsonschema_encoder().encode(var)
 
-def get_ariables_dictionary(json,keyName=None):
+def get_variables_dictionary(json,keyName=None):
     if 'type' not in json:
         return {
             keyName:''
@@ -167,7 +167,7 @@ def get_ariables_dictionary(json,keyName=None):
             dictionary={
             }
             for key in json['properties'].keys():
-                dictionary[key]=generateVariablesDictionary(json['properties'][key],key) if 'type' in json['properties'][key] else ''
+                dictionary[key]=get_variables_dictionary(json['properties'][key],key) if 'type' in json['properties'][key] else ''
             return dictionary
         case 'array':
-            return [generateVariablesDictionary(json['items'])]
+            return [get_variables_dictionary(json['items'])]
