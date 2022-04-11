@@ -157,17 +157,17 @@ def to_json_schema(var, jsonschema_encoder=JSONSchemaDraft4Encoder):
     """
     return jsonschema_encoder().encode(var)
 
-def getVariablesDictionary(json,keyName=None):
-	if 'type' not in json:
-		return {
-			keyName:''
-		}
-	match json['type']:
-		case 'object':
-			dictionary={
-			}
-			for key in json['properties'].keys():
-				dictionary[key]=getVariablesDictionary(json['properties'][key],key) if 'type' in json['properties'][key] else ''
-			return dictionary
-		case 'array':
-			return [getVariablesDictionary(json['items'])]
+def get_ariables_dictionary(json,keyName=None):
+    if 'type' not in json:
+        return {
+            keyName:''
+        }
+    match json['type']:
+        case 'object':
+            dictionary={
+            }
+            for key in json['properties'].keys():
+                dictionary[key]=generateVariablesDictionary(json['properties'][key],key) if 'type' in json['properties'][key] else ''
+            return dictionary
+        case 'array':
+            return [generateVariablesDictionary(json['items'])]
